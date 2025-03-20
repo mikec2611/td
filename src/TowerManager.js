@@ -229,50 +229,219 @@ export class TowerManager {
         ctx.fillStyle = 'rgba(0, 0, 0, 0)';
         ctx.fillRect(0, 0, 128, 128);
         
-        // Create SVG image
-        const svgData = tower.svgIcon
-          .replace(/currentColor/g, `#${new THREE.Color(tower.color).getHexString()}`);
+        // Draw a colored circle as background
+        ctx.fillStyle = `#${new THREE.Color(tower.color).getHexString()}`;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(64, 64, 40, 0, Math.PI * 2);
+        ctx.fill();
         
-        const svg = new Blob([svgData], {type: 'image/svg+xml'});
-        const url = URL.createObjectURL(svg);
+        // Draw a simple shape based on tower type
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = 'white';
         
-        // Create an image and load the SVG
-        const img = new Image();
-        
-        // Store a promise that resolves when the icon is loaded
-        this.prerenderedIcons[tower.id] = new Promise((resolve) => {
-          img.onload = () => {
-            // Draw the SVG
-            ctx.drawImage(img, 0, 0, 128, 128);
-            
-            // Create a glowing halo effect
-            const gradient = ctx.createRadialGradient(64, 64, 20, 64, 64, 64);
-            gradient.addColorStop(0, `rgba(${new THREE.Color(tower.color).r * 255}, ${new THREE.Color(tower.color).g * 255}, ${new THREE.Color(tower.color).b * 255}, 0.7)`);
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            
-            ctx.globalCompositeOperation = 'destination-over';
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 128, 128);
-            
-            // Create texture
-            const texture = new THREE.CanvasTexture(canvas);
-            
-            // Revoke the blob URL to prevent memory leaks
-            URL.revokeObjectURL(url);
-            
-            resolve(texture);
-          };
+        // Draw different shapes based on tower type
+        switch(tower.id) {
+          case 1: // Basic Tower - single rectangle
+            ctx.fillRect(56, 30, 16, 70);
+            break;
           
-          // Handle errors
-          img.onerror = () => {
-            console.error(`Failed to load SVG icon for tower ${tower.id}`);
-            URL.revokeObjectURL(url);
-            resolve(null);
-          };
-        });
+          case 2: // Double Tower - two rectangles
+            ctx.fillRect(46, 30, 12, 70);
+            ctx.fillRect(70, 30, 12, 70);
+            break;
+          
+          case 3: // Triple Tower - three rectangles
+            ctx.fillRect(38, 30, 10, 70);
+            ctx.fillRect(59, 30, 10, 70);
+            ctx.fillRect(80, 30, 10, 70);
+            break;
+          
+          case 4: // Lightning Tower
+            ctx.beginPath();
+            ctx.moveTo(50, 30);
+            ctx.lineTo(70, 30);
+            ctx.lineTo(60, 55);
+            ctx.lineTo(80, 55);
+            ctx.lineTo(40, 100);
+            ctx.lineTo(50, 65);
+            ctx.lineTo(30, 65);
+            ctx.closePath();
+            ctx.fill();
+            break;
+          
+          case 5: // Cannon Tower - concentric circles
+            ctx.beginPath();
+            ctx.arc(64, 64, 35, 0, Math.PI * 2);
+            ctx.globalAlpha = 0.3;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(64, 64, 25, 0, Math.PI * 2);
+            ctx.globalAlpha = 0.5;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(64, 64, 15, 0, Math.PI * 2);
+            ctx.globalAlpha = 1.0;
+            ctx.fill();
+            break;
+          
+          case 6: // Plasma Tower - swirl
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(64, 64, 35, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Add a swirl effect
+            for (let i = 0; i < 3; i++) {
+              ctx.beginPath();
+              ctx.arc(64, 64, 20, i * 2, i * 2 + Math.PI);
+              ctx.stroke();
+            }
+            break;
+          
+          case 7: // Laser Tower - crosshair
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = 'white';
+            
+            // Horizontal line
+            ctx.beginPath();
+            ctx.moveTo(20, 64);
+            ctx.lineTo(108, 64);
+            ctx.stroke();
+            
+            // Vertical line
+            ctx.beginPath();
+            ctx.moveTo(64, 20);
+            ctx.lineTo(64, 108);
+            ctx.stroke();
+            
+            // Center circle
+            ctx.beginPath();
+            ctx.arc(64, 64, 15, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+          
+          case 8: // Photon Tower - star shape
+            ctx.beginPath();
+            // Draw 8-point star
+            for (let i = 0; i < 8; i++) {
+              const angle = i * Math.PI / 4;
+              const x1 = 64 + Math.cos(angle) * 40;
+              const y1 = 64 + Math.sin(angle) * 40;
+              const x2 = 64 + Math.cos(angle + Math.PI/8) * 20;
+              const y2 = 64 + Math.sin(angle + Math.PI/8) * 20;
+              
+              if (i === 0) {
+                ctx.moveTo(x1, y1);
+              } else {
+                ctx.lineTo(x1, y1);
+              }
+              ctx.lineTo(x2, y2);
+            }
+            ctx.closePath();
+            ctx.fill();
+            break;
+          
+          case 9: // Nova Tower - burst star
+            ctx.beginPath();
+            // Draw 12-point star
+            for (let i = 0; i < 12; i++) {
+              const angle = i * Math.PI / 6;
+              const radius = i % 2 === 0 ? 40 : 20;
+              const x = 64 + Math.cos(angle) * radius;
+              const y = 64 + Math.sin(angle) * radius;
+              
+              if (i === 0) {
+                ctx.moveTo(x, y);
+              } else {
+                ctx.lineTo(x, y);
+              }
+            }
+            ctx.closePath();
+            ctx.fill();
+            break;
+          
+          case 10: // Quantum Tower - atom
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'white';
+            
+            // Central nucleus
+            ctx.beginPath();
+            ctx.arc(64, 64, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Electron orbits
+            for (let i = 0; i < 3; i++) {
+              ctx.beginPath();
+              ctx.ellipse(64, 64, 40, 20, i * Math.PI / 3, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            break;
+          
+          case 11: // Vortex Tower - spiral
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'white';
+            
+            // Draw a spiral
+            ctx.beginPath();
+            for (let angle = 0; angle < 12 * Math.PI; angle += 0.1) {
+              const radius = 5 + angle * 1.5;
+              const x = 64 + Math.cos(angle) * radius;
+              const y = 64 + Math.sin(angle) * radius;
+              
+              if (angle === 0) {
+                ctx.moveTo(x, y);
+              } else {
+                ctx.lineTo(x, y);
+              }
+            }
+            ctx.stroke();
+            break;
+          
+          case 12: // Supernova Tower - explosive burst
+            // Draw a complex starburst
+            for (let i = 0; i < 16; i++) {
+              const angle = i * Math.PI / 8;
+              ctx.beginPath();
+              ctx.moveTo(64, 64);
+              ctx.lineTo(
+                64 + Math.cos(angle) * 50,
+                64 + Math.sin(angle) * 50
+              );
+              ctx.lineWidth = 3 + Math.random() * 3;
+              ctx.stroke();
+            }
+            
+            // Center circle
+            ctx.beginPath();
+            ctx.arc(64, 64, 15, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+          
+          default:
+            // Fallback to text
+            ctx.font = '36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(tower.id.toString(), 64, 64);
+        }
         
-        // Start loading
-        img.src = url;
+        // Create a glowing halo effect
+        ctx.globalAlpha = 0.5;
+        ctx.globalCompositeOperation = 'destination-over';
+        const gradient = ctx.createRadialGradient(64, 64, 20, 64, 64, 64);
+        gradient.addColorStop(0, `rgba(${new THREE.Color(tower.color).r * 255}, ${new THREE.Color(tower.color).g * 255}, ${new THREE.Color(tower.color).b * 255}, 0.7)`);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 128, 128);
+        
+        // Create and store the texture
+        const texture = new THREE.CanvasTexture(canvas);
+        this.prerenderedIcons[tower.id] = Promise.resolve(texture);
       }
     });
   }

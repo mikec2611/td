@@ -9,6 +9,10 @@ export class GameManager {
     this.score = 0;
     this.waveNumber = 1;
     
+    // Enemy wave configuration
+    this.enemySpawnCount = 10; // Base number of enemies per wave
+    this.enemyTypes = ['normal']; // Available enemy types
+    
     this.buildMode = null;
     this.lastUpdateTime = performance.now() / 1000;
     
@@ -155,9 +159,68 @@ export class GameManager {
     this.buildMode = mode;
   }
   
-  startWave() {
-    this.enemyManager.startWave(this.waveNumber);
+  startWave(waveNumber = 1, maxWaves = 30) {
+    this.waveNumber = waveNumber;
+    
+    // Calculate difficulty based on wave number
+    const difficultyFactor = waveNumber / maxWaves;
+    
+    // Scale enemy count: starts at 10, increases by 3-5 each wave, capped at 80
+    const baseEnemyCount = this.enemySpawnCount;
+    const enemyCountIncrease = Math.floor(3 + (waveNumber / 5));
+    const maxEnemyCount = 80;
+    const enemyCount = Math.min(baseEnemyCount + ((waveNumber - 1) * enemyCountIncrease), maxEnemyCount);
+    
+    // Determine enemy types based on wave number
+    let availableEnemyTypes = ['normal'];
+    
+    if (waveNumber >= 5) {
+      availableEnemyTypes.push('fast'); // Fast enemies starting at wave 5
+    }
+    
+    if (waveNumber >= 10) {
+      availableEnemyTypes.push('tough'); // Tough enemies starting at wave 10
+    }
+    
+    if (waveNumber >= 15) {
+      availableEnemyTypes.push('armored'); // Armored enemies starting at wave 15
+    }
+    
+    if (waveNumber >= 20) {
+      availableEnemyTypes.push('boss'); // Boss enemies starting at wave 20
+    }
+    
+    if (waveNumber >= 25) {
+      availableEnemyTypes.push('elite'); // Elite enemies starting at wave 25
+    }
+    
+    // Calculate enemy health and speed scaling
+    const healthScaling = 1 + (difficultyFactor * 4); // Health scales up to 5x
+    const speedScaling = 1 + (difficultyFactor * 1.5); // Speed scales up to 2.5x
+    
+    // Start the wave with calculated parameters
+    this.enemyManager.startWave(
+      this.waveNumber, 
+      enemyCount, 
+      availableEnemyTypes, 
+      healthScaling,
+      speedScaling
+    );
+    
     this.updateUI();
+    
+    // Show a notification about the wave
+    if (waveNumber >= 20) {
+      this.showNotification(`Wave ${waveNumber}: DANGER! Boss enemies incoming!`, '#ff5500');
+    } else if (waveNumber >= 15) {
+      this.showNotification(`Wave ${waveNumber}: Armored enemies approaching!`, '#ff9900');
+    } else if (waveNumber >= 10) {
+      this.showNotification(`Wave ${waveNumber}: Tough enemies approaching!`, '#ffcc00');
+    } else if (waveNumber >= 5) {
+      this.showNotification(`Wave ${waveNumber}: Fast enemies incoming!`, '#aaff00');
+    } else {
+      this.showNotification(`Wave ${waveNumber} incoming!`, '#ffffff');
+    }
   }
   
   onEnemyReachedEnd() {
@@ -170,12 +233,53 @@ export class GameManager {
   }
   
   onEnemyKilled(event) {
+    const enemyType = event.detail.enemyType || 'normal';
+    
+    // Award money based on enemy type
+    let baseReward = 10;
+    let scoreValue = 100;
+    
+    switch(enemyType) {
+      case 'fast':
+        baseReward = 15;
+        scoreValue = 150;
+        break;
+        
+      case 'tough':
+        baseReward = 20;
+        scoreValue = 200;
+        break;
+        
+      case 'armored':
+        baseReward = 25;
+        scoreValue = 300;
+        break;
+        
+      case 'boss':
+        baseReward = 50;
+        scoreValue = 500;
+        break;
+        
+      case 'elite':
+        baseReward = 40;
+        scoreValue = 400;
+        break;
+    }
+    
+    // Apply wave scaling to rewards
+    const waveScaling = 1 + Math.floor(this.waveNumber / 3) * 0.1; // 10% increase every 3 waves
+    const rewardAmount = Math.floor(baseReward * waveScaling);
+    
     // Award money
-    const rewardAmount = 10 + Math.floor(this.waveNumber / 2);
     this.money += rewardAmount;
     
     // Add score
-    this.score += 100 + (this.waveNumber * 10);
+    this.score += scoreValue + (this.waveNumber * 10);
+    
+    // Show quick notification for special enemy types
+    if (enemyType !== 'normal') {
+      this.displayGameInfo(`${enemyType.toUpperCase()} enemy killed! +$${rewardAmount}`);
+    }
     
     this.updateUI();
   }

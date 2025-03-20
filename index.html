@@ -56,15 +56,18 @@
       left: 50%;
       transform: translateX(-50%);
       color: white;
-      background-color: rgba(0, 0, 0, 0.5);
+      background-color: rgba(0, 0, 0, 0.7);
       padding: 10px 20px;
-      border-radius: 5px;
+      border-radius: 8px;
       font-size: 1.2em;
       font-weight: bold;
       z-index: 10;
       text-align: center;
-      min-width: 250px;
+      min-width: 300px;
       min-height: 20px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--faction-color, #0088ff);
+      transition: all 0.3s ease;
     }
     /* Game Info Box */
     #game-info {
@@ -507,7 +510,6 @@
     <div id="build-controls">
       <button id="toggle-range">Show Range</button>
       <button id="toggle-path">Show Path</button>
-      <button id="start-wave">Start Wave</button>
     </div>
     <div id="dev-mode">
       <button id="toggle-dev-mode">DEV MODE</button>

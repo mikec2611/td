@@ -7,11 +7,15 @@ import { TOWER_TYPES } from './TowerTypes.js';
 // Game settings
 const GRID_SIZE = 15; // Grid is 15x15
 const CELL_SIZE = 2; // Each cell is 2x2 units
-const WAVE_INTERVAL = 30000; // 30 seconds between waves
+const FIRST_WAVE_DELAY = 15000; // 15 seconds before first wave
+const NEXT_WAVE_DELAY = 10000; // 10 seconds between waves
+const MAX_WAVES = 30; // Maximum number of waves
 
 // Track selected faction
 let selectedFaction = null;
 let waveTimer = null;
+let isFirstWave = true; // Track if it's the first wave
+let currentWave = 0; // Track current wave number
 
 // Initialize the faction selection screen
 function initFactionSelection() {
@@ -205,13 +209,17 @@ function initGame(faction) {
     }
   });
   
-  // Change start wave button to show next wave countdown
+  // Hide the start wave button as we're using notification area instead
   const startWaveBtn = document.getElementById('start-wave');
-  startWaveBtn.textContent = 'Wave Starting Soon...';
-  startWaveBtn.disabled = true;
+  if (startWaveBtn) {
+    startWaveBtn.style.display = 'none';
+  }
   
-  // Setup automatic wave spawning
-  setupAutoWaveSpawning(gameManager, startWaveBtn);
+  // Setup automatic wave spawning for the first wave
+  setupAutoWaveSpawning(gameManager);
+  
+  // Setup wave completion handler for subsequent waves
+  setupWaveCompletionHandler(gameManager);
   
   // Animation loop
   function animate() {
@@ -226,12 +234,69 @@ function initGame(faction) {
 }
 
 // Setup automatic wave spawning
-function setupAutoWaveSpawning(gameManager, startWaveBtn) {
-  let countdown = WAVE_INTERVAL / 1000;
+function setupAutoWaveSpawning(gameManager) {
+  const notificationArea = document.getElementById('notification-area');
   
-  // Update the button to show countdown
+  // For first wave, use the initial delay
+  if (isFirstWave) {
+    let countdown = Math.floor(FIRST_WAVE_DELAY / 1000);
+    
+    // Update the notification area to show countdown
+    const updateCountdown = () => {
+      notificationArea.textContent = `First wave starting in: ${countdown}s`;
+    };
+    
+    // Call immediately to set initial text
+    updateCountdown();
+    
+    // Start the countdown
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      updateCountdown();
+      
+      if (countdown <= 0) {
+        clearInterval(countdownInterval); // Clear this interval
+        
+        // Start first wave
+        currentWave = 1;
+        notificationArea.textContent = `Wave ${currentWave}/${MAX_WAVES} incoming!`;
+        gameManager.startWave(currentWave, MAX_WAVES);
+        
+        // No longer first wave
+        isFirstWave = false;
+      }
+    }, 1000);
+    
+    // Store the timer reference so it can be cleared if needed
+    waveTimer = countdownInterval;
+  }
+}
+
+// Setup wave completion handler
+function setupWaveCompletionHandler(gameManager) {
+  // Listen for wave completion event
+  document.addEventListener('waveCompleted', (event) => {
+    console.log('Wave completed event received');
+    if (currentWave >= MAX_WAVES) {
+      // Final wave completed
+      const notificationArea = document.getElementById('notification-area');
+      notificationArea.textContent = "Final wave completed! You win!";
+      return;
+    }
+    
+    // Set a timer for the next wave
+    startNextWaveCountdown(gameManager, NEXT_WAVE_DELAY);
+  });
+}
+
+// Function to start countdown for next wave
+function startNextWaveCountdown(gameManager, delay) {
+  const notificationArea = document.getElementById('notification-area');
+  let countdown = Math.floor(delay / 1000);
+  
+  // Update the notification to show the countdown
   const updateCountdown = () => {
-    startWaveBtn.textContent = `Next Wave: ${countdown}s`;
+    notificationArea.textContent = `Wave ${currentWave+1}/${MAX_WAVES} - Next wave in: ${countdown}s`;
   };
   
   // Call immediately to set initial text
@@ -244,20 +309,15 @@ function setupAutoWaveSpawning(gameManager, startWaveBtn) {
     
     if (countdown <= 0) {
       clearInterval(countdownInterval); // Clear this interval
-      gameManager.startWave(); // Start the wave
       
-      // Reset the countdown for the next wave
-      setTimeout(() => {
-        countdown = WAVE_INTERVAL / 1000;
-        updateCountdown();
-        
-        // Restart the interval for next wave
-        setupAutoWaveSpawning(gameManager, startWaveBtn);
-      }, 3000); // Give a short delay after wave starts
+      // Start the next wave
+      currentWave++;
+      notificationArea.textContent = `Wave ${currentWave}/${MAX_WAVES} incoming!`;
+      gameManager.startWave(currentWave, MAX_WAVES);
     }
   }, 1000);
   
-  // Store the timer reference so it can be cleared if needed
+  // Store the timer reference
   waveTimer = countdownInterval;
 }
 
@@ -268,22 +328,34 @@ function applyFactionTheme(faction, scene) {
     case 'tech':
       scene.background = new THREE.Color(0x001a33); // Dark blue tech background
       document.body.style.setProperty('--faction-color', '#00c6ff');
-      document.getElementById('tower-stats').style.borderColor = '#00c6ff';
-      document.getElementById('tower-name').style.color = '#00c6ff';
+      if (document.getElementById('tower-stats')) {
+        document.getElementById('tower-stats').style.borderColor = '#00c6ff';
+      }
+      if (document.getElementById('tower-name')) {
+        document.getElementById('tower-name').style.color = '#00c6ff';
+      }
       break;
       
     case 'energy':
       scene.background = new THREE.Color(0x1a0d00); // Dark orange energy background
       document.body.style.setProperty('--faction-color', '#f5d020');
-      document.getElementById('tower-stats').style.borderColor = '#f5d020';
-      document.getElementById('tower-name').style.color = '#f5d020';
+      if (document.getElementById('tower-stats')) {
+        document.getElementById('tower-stats').style.borderColor = '#f5d020';
+      }
+      if (document.getElementById('tower-name')) {
+        document.getElementById('tower-name').style.color = '#f5d020';
+      }
       break;
       
     case 'elemental':
       scene.background = new THREE.Color(0x071a00); // Dark green nature background
       document.body.style.setProperty('--faction-color', '#a8e063');
-      document.getElementById('tower-stats').style.borderColor = '#a8e063';
-      document.getElementById('tower-name').style.color = '#a8e063';
+      if (document.getElementById('tower-stats')) {
+        document.getElementById('tower-stats').style.borderColor = '#a8e063';
+      }
+      if (document.getElementById('tower-name')) {
+        document.getElementById('tower-name').style.color = '#a8e063';
+      }
       break;
   }
 }
