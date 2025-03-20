@@ -17,9 +17,11 @@ export class GameManager {
     this.originalEnemySpeed = this.enemyManager.enemySpeed;
     
     // UI elements
-    this.moneyDisplay = document.getElementById('money');
-    this.livesDisplay = document.getElementById('lives');
+    this.goldDisplay = document.getElementById('money');
+    this.healthDisplay = document.getElementById('lives');
     this.waveDisplay = document.getElementById('wave');
+    this.enemiesDisplay = document.getElementById('enemies-remaining') || document.createElement('span');
+    this.gameInfoDisplay = document.getElementById('game-info') || document.createElement('div');
     
     // Event listeners
     document.addEventListener('enemyReachedEnd', this.onEnemyReachedEnd.bind(this));
@@ -45,7 +47,7 @@ export class GameManager {
     if (this.devMode) {
       // Enable dev mode
       devModeButton.classList.add('active');
-      this.enemyManager.enemySpeed = this.originalEnemySpeed * 10; // 10x faster enemies (was 5x)
+      this.enemyManager.enemySpeed = this.originalEnemySpeed * 10; // 10x faster enemies
       
       // Display dev mode notification
       this.showNotification('DEVELOPER MODE ENABLED', '#ff0000');
@@ -92,27 +94,31 @@ export class GameManager {
     
     // Update tower manager
     this.towerManager.update(deltaTime, this.enemyManager);
+    
+    // Update enemies display
+    this.enemiesDisplay.textContent = this.enemyManager.getActiveEnemyCount();
   }
   
   handleCellClick(cell) {
-    if (!this.buildMode) return;
+    // Check if we have enough money to build the selected tower
+    const towerCost = this.towerManager.getTowerCost();
     
-    if (this.buildMode === 'tower') {
-      // In dev mode, ignore money requirements
-      if (this.devMode || this.money >= this.towerManager.getTowerCost()) {
-        // Try to build tower
-        const tower = this.towerManager.buildTower(cell.x, cell.y);
-        
-        if (tower) {
-          // Deduct money (if not in dev mode)
-          if (!this.devMode) {
-            this.money -= this.towerManager.getTowerCost();
-          }
-          this.updateUI();
+    // In dev mode, ignore money requirements
+    if (this.devMode || this.money >= towerCost) {
+      // Try to build tower
+      const tower = this.towerManager.buildTower(cell.x, cell.y);
+      
+      if (tower) {
+        // Deduct money (if not in dev mode)
+        if (!this.devMode) {
+          this.money -= towerCost;
         }
+        this.updateUI();
       } else {
-        console.log('Not enough money to build tower!');
+        this.displayGameInfo('Cannot build there!');
       }
+    } else {
+      this.displayGameInfo('Not enough gold!');
     }
   }
   
@@ -154,41 +160,40 @@ export class GameManager {
     this.waveNumber = event.detail.nextWaveNumber;
     this.updateUI();
     
-    console.log(`Wave ${event.detail.waveNumber} completed! Wave ${this.waveNumber} ready.`);
+    this.displayGameInfo(`Wave ${event.detail.waveNumber} completed! Next wave ready.`);
   }
   
   onPathChanged(event) {
     // Display a message about the path change
-    const pathChangeMessage = document.createElement('div');
-    pathChangeMessage.textContent = "Enemies rerouting!";
-    pathChangeMessage.style.position = 'absolute';
-    pathChangeMessage.style.top = '40%';
-    pathChangeMessage.style.left = '50%';
-    pathChangeMessage.style.transform = 'translate(-50%, -50%)';
-    pathChangeMessage.style.color = '#00ffff';
-    pathChangeMessage.style.fontSize = '24px';
-    pathChangeMessage.style.fontWeight = 'bold';
-    pathChangeMessage.style.textShadow = '0 0 5px rgba(0, 255, 255, 0.7)';
-    pathChangeMessage.style.zIndex = '100';
-    document.body.appendChild(pathChangeMessage);
-    
-    // Remove the message after a short delay
-    setTimeout(() => {
-      document.body.removeChild(pathChangeMessage);
-    }, 1500);
+    this.showNotification("Enemies rerouting!", '#00ffff');
+  }
+  
+  displayGameInfo(message) {
+    if (this.gameInfoDisplay) {
+      this.gameInfoDisplay.textContent = message;
+      
+      // Clear the message after a delay
+      setTimeout(() => {
+        if (this.gameInfoDisplay) {
+          this.gameInfoDisplay.textContent = '';
+        }
+      }, 3000);
+    } else {
+      console.log(message); // Fallback to console if element doesn't exist
+    }
   }
   
   updateUI() {
     // Update UI displays
     if (this.devMode) {
-      this.moneyDisplay.textContent = "∞"; // Infinity symbol for unlimited money
-      this.moneyDisplay.style.color = "#ff9900"; // Gold color to indicate dev mode
+      this.goldDisplay.textContent = "∞"; // Infinity symbol for unlimited money
+      this.goldDisplay.style.color = "#ff9900"; // Gold color to indicate dev mode
     } else {
-      this.moneyDisplay.textContent = this.money;
-      this.moneyDisplay.style.color = ""; // Reset to default
+      this.goldDisplay.textContent = this.money;
+      this.goldDisplay.style.color = ""; // Reset to default
     }
     
-    this.livesDisplay.textContent = this.lives;
+    this.healthDisplay.textContent = this.lives;
     this.waveDisplay.textContent = this.waveNumber;
   }
   

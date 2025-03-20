@@ -1,11 +1,12 @@
-import * as THREE from 'three';
+import { TOWER_TYPES } from './TowerTypes.js';
 
 export class TowerManager {
   constructor(scene, gridManager) {
     this.scene = scene;
     this.gridManager = gridManager;
     this.towers = [];
-    this.towerCost = 20; // Base cost of a tower
+    this.towerTypes = TOWER_TYPES;
+    this.selectedTowerType = this.towerTypes[0]; // Default to first tower
     
     // Create a path visualization group
     this.pathVisualization = new THREE.Group();
@@ -131,21 +132,24 @@ export class TowerManager {
       return false;
     }
     
+    // Get the selected tower type configuration
+    const towerType = this.selectedTowerType;
+    
     // Create tower base
     const baseGeometry = new THREE.CylinderGeometry(0.6, 0.8, 0.4, 8);
-    const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x0088ff });
+    const baseMaterial = new THREE.MeshLambertMaterial({ color: towerType.color });
     const baseMesh = new THREE.Mesh(baseGeometry, baseMaterial);
     baseMesh.position.y = 0.2;
     
     // Create tower middle
     const middleGeometry = new THREE.CylinderGeometry(0.4, 0.6, 0.6, 8);
-    const middleMaterial = new THREE.MeshLambertMaterial({ color: 0x0066cc });
+    const middleMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(towerType.color).offsetHSL(0, 0, -0.1) });
     const middleMesh = new THREE.Mesh(middleGeometry, middleMaterial);
     middleMesh.position.y = 0.7;
     
     // Create tower top
     const topGeometry = new THREE.CylinderGeometry(0.2, 0.4, 0.3, 8);
-    const topMaterial = new THREE.MeshLambertMaterial({ color: 0x004499 });
+    const topMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(towerType.color).offsetHSL(0, 0, -0.2) });
     const topMesh = new THREE.Mesh(topGeometry, topMaterial);
     topMesh.position.y = 1.15;
     
@@ -172,10 +176,17 @@ export class TowerManager {
     towerGroup.add(topMesh);
     towerGroup.add(mountMesh);
     
+    // Add tower type indicator (e.g., level number)
+    const levelGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.1);
+    const levelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const levelIndicator = new THREE.Mesh(levelGeometry, levelMaterial);
+    levelIndicator.position.set(0, 1.6, 0);
+    towerGroup.add(levelIndicator);
+    
     // Add range indicator (invisible by default)
-    const rangeGeometry = new THREE.RingGeometry(0, 4, 32);
+    const rangeGeometry = new THREE.RingGeometry(0, towerType.range, 32);
     const rangeMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0x00ffff, 
+      color: towerType.color, 
       transparent: true, 
       opacity: 0.2,
       side: THREE.DoubleSide
@@ -200,11 +211,12 @@ export class TowerManager {
       rangeIndicator: rangeIndicator,
       x: x,
       y: y,
-      range: 4,
-      damage: 20,
-      fireRate: 1, // Shots per second
+      range: towerType.range,
+      damage: towerType.damage,
+      fireRate: towerType.fireRate,
       lastFired: 0,
-      target: null
+      target: null,
+      type: towerType.id
     };
     
     this.towers.push(tower);
@@ -312,14 +324,25 @@ export class TowerManager {
   }
   
   getTowerCost() {
-    return this.towerCost;
+    return this.selectedTowerType.cost;
+  }
+  
+  setSelectedTowerType(towerTypeId) {
+    const towerType = this.towerTypes.find(t => t.id === towerTypeId);
+    if (towerType) {
+      this.selectedTowerType = towerType;
+      return true;
+    }
+    return false;
   }
   
   // Toggle range indicators for all towers
   toggleRangeIndicators(show) {
-    for (const tower of this.towers) {
-      tower.rangeIndicator.visible = show;
-    }
+    this.towers.forEach(tower => {
+        if (tower.rangeIndicator) {
+            tower.rangeIndicator.visible = show;
+        }
+    });
   }
   
   updatePathMarkers(deltaTime) {

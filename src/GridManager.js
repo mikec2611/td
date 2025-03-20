@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { PathFinder } from './PathFinder.js';
 
 export class GridManager {

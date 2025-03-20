@@ -1,8 +1,8 @@
-import * as THREE from 'three';
 import { GridManager } from './GridManager.js';
 import { EnemyManager } from './EnemyManager.js';
 import { TowerManager } from './TowerManager.js';
 import { GameManager } from './GameManager.js';
+import { TOWER_TYPES } from './TowerTypes.js';
 
 // Game settings
 const GRID_SIZE = 15; // Grid is 15x15
@@ -65,6 +65,89 @@ if (initialPath) {
   towerManager.updatePathVisualization(initialPath);
 }
 
+// Setup tower selection panel
+function setupTowerSelectionPanel() {
+  const panel = document.getElementById('tower-selection-panel');
+  const statsPanel = document.getElementById('tower-stats');
+  
+  // Clear any existing content
+  panel.innerHTML = '';
+  
+  // Add each tower option
+  TOWER_TYPES.forEach(tower => {
+    const towerOption = document.createElement('div');
+    towerOption.classList.add('tower-option');
+    towerOption.dataset.towerId = tower.id;
+    
+    // Set background color to match tower color
+    towerOption.style.backgroundColor = `#${new THREE.Color(tower.color).getHexString()}`;
+    
+    // Add tower icon
+    const towerIcon = document.createElement('div');
+    towerIcon.textContent = tower.icon;
+    towerIcon.style.fontSize = '24px';
+    towerOption.appendChild(towerIcon);
+    
+    // Add cost display
+    const costDisplay = document.createElement('div');
+    costDisplay.classList.add('tower-cost');
+    costDisplay.textContent = `$${tower.cost}`;
+    towerOption.appendChild(costDisplay);
+    
+    // Set the first tower as selected by default
+    if (tower.id === 1) {
+      towerOption.classList.add('selected');
+    }
+    
+    // Add event listeners for interaction
+    towerOption.addEventListener('click', () => {
+      // Remove selected class from all options
+      document.querySelectorAll('.tower-option').forEach(el => {
+        el.classList.remove('selected');
+      });
+      
+      // Add selected class to clicked option
+      towerOption.classList.add('selected');
+      
+      // Update the selected tower in the tower manager
+      towerManager.setSelectedTowerType(tower.id);
+      
+      // Hide stats panel when selecting
+      statsPanel.style.display = 'none';
+    });
+    
+    // Show tower stats on hover
+    towerOption.addEventListener('mouseenter', () => {
+      displayTowerStats(tower);
+    });
+    
+    towerOption.addEventListener('mouseleave', () => {
+      statsPanel.style.display = 'none';
+    });
+    
+    panel.appendChild(towerOption);
+  });
+}
+
+// Display tower stats in tooltip
+function displayTowerStats(tower) {
+  const statsPanel = document.getElementById('tower-stats');
+  
+  // Update stats content
+  document.getElementById('tower-name').textContent = tower.name;
+  document.getElementById('tower-cost-stat').textContent = `$${tower.cost}`;
+  document.getElementById('tower-damage-stat').textContent = tower.damage;
+  document.getElementById('tower-range-stat').textContent = tower.range;
+  document.getElementById('tower-fire-rate-stat').textContent = tower.fireRate.toFixed(1);
+  document.getElementById('tower-description').textContent = tower.description;
+  
+  // Show the stats panel
+  statsPanel.style.display = 'block';
+}
+
+// Initialize tower selection panel
+setupTowerSelectionPanel();
+
 // Raycaster for mouse interaction
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -113,16 +196,6 @@ window.addEventListener('mousemove', (event) => {
 });
 
 // Add event listeners for UI buttons
-document.getElementById('build-tower').addEventListener('click', () => {
-  gameManager.setBuildMode('tower');
-  
-  // Remove active class from other buttons
-  document.getElementById('toggle-range').classList.remove('btn-active');
-  
-  // Add active class to this button
-  document.getElementById('build-tower').classList.add('btn-active');
-});
-
 document.getElementById('toggle-range').addEventListener('click', () => {
   const rangeButton = document.getElementById('toggle-range');
   const isShowing = rangeButton.classList.contains('btn-active');
@@ -137,10 +210,6 @@ document.getElementById('toggle-range').addEventListener('click', () => {
     rangeButton.textContent = 'Hide Range';
     towerManager.toggleRangeIndicators(true);
   }
-  
-  // Deactivate build mode
-  gameManager.setBuildMode(null);
-  document.getElementById('build-tower').classList.remove('btn-active');
 });
 
 document.getElementById('toggle-path').addEventListener('click', () => {
@@ -163,17 +232,10 @@ document.getElementById('toggle-path').addEventListener('click', () => {
       towerManager.updatePathVisualization(currentPath);
     }
   }
-  
-  // Deactivate build mode
-  gameManager.setBuildMode(null);
-  document.getElementById('build-tower').classList.remove('btn-active');
 });
 
 document.getElementById('start-wave').addEventListener('click', () => {
   gameManager.startWave();
-  
-  // Deactivate buttons
-  document.getElementById('build-tower').classList.remove('btn-active');
 });
 
 // Animation loop

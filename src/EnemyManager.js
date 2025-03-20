@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 export class EnemyManager {
   constructor(scene, gridManager) {
     this.scene = scene;
@@ -371,5 +369,10 @@ export class EnemyManager {
       const distance = enemy.mesh.position.distanceTo(position);
       return distance <= range;
     });
+  }
+  
+  // Get the number of active enemies
+  getActiveEnemyCount() {
+    return this.enemies.length;
   }
 } 
