@@ -111,16 +111,6 @@ export class GridManager {
     gridPlane.receiveShadow = true;
     this.scene.add(gridPlane);
     
-    // Grid lines for better visibility
-    const gridHelper = new THREE.GridHelper(
-      this.gridSize * this.cellSize,
-      this.gridSize,
-      0x000000,
-      0x444444
-    );
-    gridHelper.position.y = 0;
-    this.scene.add(gridHelper);
-    
     // Create path from start to end
     this.highlightInitialPath();
     
@@ -129,8 +119,8 @@ export class GridManager {
       for (let x = 0; x < this.gridSize; x++) {
         const cell = this.grid[y][x];
         
-        // Create cell mesh
-        const cellGeometry = new THREE.BoxGeometry(this.cellSize * 0.9, 0.1, this.cellSize * 0.9);
+        // Create cell mesh - make the cells smaller and without borders
+        const cellGeometry = new THREE.BoxGeometry(this.cellSize * 0.95, 0.1, this.cellSize * 0.95);
         let cellMaterial;
         
         if (cell.type === 'start') {
@@ -144,11 +134,12 @@ export class GridManager {
             emissive: 0x440000
           }); // Red for end
         } else {
+          // Make regular cells completely transparent, we'll just use the base grid
           cellMaterial = new THREE.MeshLambertMaterial({ 
             color: 0x777777,
             transparent: true,
-            opacity: 0.7
-          }); // Lighter gray for empty
+            opacity: 0.0 // Completely transparent regular cells
+          });
         }
         
         const cellMesh = new THREE.Mesh(cellGeometry, cellMaterial);
@@ -250,7 +241,7 @@ export class GridManager {
     // Update cell appearance
     const cellMesh = cell.object;
     cellMesh.material.color.set(0x0077cc); // Darker blue for tower base
-    cellMesh.material.opacity = 1.0;
+    cellMesh.material.opacity = 0.5; // Semi-transparent so the tower is visible on top
     
     // Calculate new path and notify the game that the path has changed
     const newPath = this.pathFinder.findPath();
@@ -293,9 +284,9 @@ export class GridManager {
         // For towers, just make them brighter
         cell.object.material.emissive = new THREE.Color(0x222288);
       } else {
-        // For empty cells, make them glow yellow
+        // For empty cells, make them glow yellow and visible
         cell.object.material.color.set(0xffff88);
-        cell.object.material.opacity = 0.9;
+        cell.object.material.opacity = 0.7; // Make visible when highlighted
         
         // Raise the cell slightly for a 3D effect
         cell.object.position.y += 0.05;

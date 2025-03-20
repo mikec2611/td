@@ -50,7 +50,7 @@
       background-color: #4CAF50;
       color: white;
     }
-    #game-title {
+    #notification-area {
       position: absolute;
       top: 10px;
       left: 50%;
@@ -62,6 +62,9 @@
       font-size: 1.2em;
       font-weight: bold;
       z-index: 10;
+      text-align: center;
+      min-width: 250px;
+      min-height: 20px;
     }
     /* Game Info Box */
     #game-info {
@@ -98,7 +101,7 @@
       color: white;
       border: 1px solid #ff0000;
     }
-    #hud, #build-controls, #game-title, #game-info, #dev-mode {
+    #hud, #build-controls, #notification-area, #game-info, #dev-mode {
       /* cursor: default; */ /* Removed to make everything a pointer */
     }
     button {
@@ -217,7 +220,7 @@
   </style>
 </head>
 <body>
-  <div id="game-title">Tower Defense</div>
+  <div id="notification-area"></div>
   <div id="hud">
     <div>Money: <span id="money">100</span></div>
     <div>Lives: <span id="lives">10</span></div>
