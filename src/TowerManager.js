@@ -13,6 +13,10 @@ export class TowerManager {
     this.pathVisualization.visible = false; // Hidden by default
     this.scene.add(this.pathVisualization);
     
+    // Prerender SVG icons for better performance
+    this.prerenderedIcons = {};
+    this.prerenderTowerIcons();
+    
     // Listen for path changes to update visualization
     document.addEventListener('pathChanged', this.onPathChanged.bind(this));
   }
@@ -135,53 +139,41 @@ export class TowerManager {
     // Get the selected tower type configuration
     const towerType = this.selectedTowerType;
     
-    // Create tower base
-    const baseGeometry = new THREE.CylinderGeometry(0.6, 0.8, 0.4, 8);
-    const baseMaterial = new THREE.MeshLambertMaterial({ color: towerType.color });
-    const baseMesh = new THREE.Mesh(baseGeometry, baseMaterial);
-    baseMesh.position.y = 0.2;
-    
-    // Create tower middle
-    const middleGeometry = new THREE.CylinderGeometry(0.4, 0.6, 0.6, 8);
-    const middleMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(towerType.color).offsetHSL(0, 0, -0.1) });
-    const middleMesh = new THREE.Mesh(middleGeometry, middleMaterial);
-    middleMesh.position.y = 0.7;
-    
-    // Create tower top
-    const topGeometry = new THREE.CylinderGeometry(0.2, 0.4, 0.3, 8);
-    const topMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(towerType.color).offsetHSL(0, 0, -0.2) });
-    const topMesh = new THREE.Mesh(topGeometry, topMaterial);
-    topMesh.position.y = 1.15;
-    
-    // Create tower turret (cannon)
-    const turretGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.8);
-    const turretMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
-    const turretMesh = new THREE.Mesh(turretGeometry, turretMaterial);
-    turretMesh.position.y = 0.2;
-    
-    // Create turret mount
-    const mountGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-    const mountMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
-    const mountMesh = new THREE.Mesh(mountGeometry, mountMaterial);
-    mountMesh.position.y = 1.35;
-    
-    // Add turret to mount
-    turretMesh.position.z = 0.5; // Position turret forward
-    mountMesh.add(turretMesh);
-    
     // Create tower group
     const towerGroup = new THREE.Group();
-    towerGroup.add(baseMesh);
-    towerGroup.add(middleMesh);
-    towerGroup.add(topMesh);
-    towerGroup.add(mountMesh);
     
-    // Add tower type indicator (e.g., level number)
-    const levelGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.1);
-    const levelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const levelIndicator = new THREE.Mesh(levelGeometry, levelMaterial);
-    levelIndicator.position.set(0, 1.6, 0);
-    towerGroup.add(levelIndicator);
+    // Create icon as the main tower representation
+    const iconSprite = this.createIconPlane(towerType.icon, towerType.color);
+    iconSprite.scale.set(1.0, 1.0, 1.0); // Make icon larger
+    iconSprite.position.set(0, 0.5, 0); // Position it just above the ground
+    towerGroup.add(iconSprite);
+    
+    // Create a small platform for the icon
+    const platformGeometry = new THREE.CircleGeometry(0.5, 16);
+    const platformMaterial = new THREE.MeshBasicMaterial({ 
+      color: towerType.color,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide
+    });
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.rotation.x = -Math.PI / 2; // Lay flat
+    platform.position.y = 0.01; // Just above ground
+    towerGroup.add(platform);
+    
+    // Add glow effect
+    const glowGeometry = new THREE.CircleGeometry(0.7, 16);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: towerType.color,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.DoubleSide
+    });
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    glow.rotation.x = -Math.PI / 2; // Lay flat
+    glow.position.y = 0.005; // Just above ground
+    glow.userData.pulseTime = 0; // For animation
+    towerGroup.add(glow);
     
     // Add range indicator (invisible by default)
     const rangeGeometry = new THREE.RingGeometry(0, towerType.range, 32);
@@ -193,7 +185,7 @@ export class TowerManager {
     });
     const rangeIndicator = new THREE.Mesh(rangeGeometry, rangeMaterial);
     rangeIndicator.rotation.x = -Math.PI / 2;
-    rangeIndicator.position.y = 0.05;
+    rangeIndicator.position.y = 0.02;
     rangeIndicator.visible = false;
     towerGroup.add(rangeIndicator);
     
@@ -207,7 +199,7 @@ export class TowerManager {
     // Create tower object
     const tower = {
       mesh: towerGroup,
-      turret: mountMesh,
+      turret: iconSprite, // Use the icon as the turret for aiming
       rangeIndicator: rangeIndicator,
       x: x,
       y: y,
@@ -224,11 +216,181 @@ export class TowerManager {
     return tower;
   }
   
+  // Prerender all tower icons for better performance
+  prerenderTowerIcons() {
+    this.towerTypes.forEach(tower => {
+      if (tower.svgIcon) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        // Fill with transparent background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+        ctx.fillRect(0, 0, 128, 128);
+        
+        // Create SVG image
+        const svgData = tower.svgIcon
+          .replace(/currentColor/g, `#${new THREE.Color(tower.color).getHexString()}`);
+        
+        const svg = new Blob([svgData], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(svg);
+        
+        // Create an image and load the SVG
+        const img = new Image();
+        
+        // Store a promise that resolves when the icon is loaded
+        this.prerenderedIcons[tower.id] = new Promise((resolve) => {
+          img.onload = () => {
+            // Draw the SVG
+            ctx.drawImage(img, 0, 0, 128, 128);
+            
+            // Create a glowing halo effect
+            const gradient = ctx.createRadialGradient(64, 64, 20, 64, 64, 64);
+            gradient.addColorStop(0, `rgba(${new THREE.Color(tower.color).r * 255}, ${new THREE.Color(tower.color).g * 255}, ${new THREE.Color(tower.color).b * 255}, 0.7)`);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 128, 128);
+            
+            // Create texture
+            const texture = new THREE.CanvasTexture(canvas);
+            
+            // Revoke the blob URL to prevent memory leaks
+            URL.revokeObjectURL(url);
+            
+            resolve(texture);
+          };
+          
+          // Handle errors
+          img.onerror = () => {
+            console.error(`Failed to load SVG icon for tower ${tower.id}`);
+            URL.revokeObjectURL(url);
+            resolve(null);
+          };
+        });
+        
+        // Start loading
+        img.src = url;
+      }
+    });
+  }
+  
+  // Create a floating icon plane that always faces the camera
+  createIconPlane(iconText, towerColor) {
+    const towerType = this.towerTypes.find(t => t.icon === iconText);
+    
+    if (towerType && this.prerenderedIcons[towerType.id]) {
+      // Use prerendered icon if available
+      const material = new THREE.SpriteMaterial({
+        transparent: true,
+        blending: THREE.AdditiveBlending
+      });
+      
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(1.0, 1.0, 1);
+      
+      // Set the texture when it's loaded
+      this.prerenderedIcons[towerType.id].then(texture => {
+        if (texture) {
+          material.map = texture;
+          material.needsUpdate = true;
+        } else {
+          // Fallback to basic icon if texture failed to load
+          this.createBasicIconTexture(material, iconText, towerColor);
+        }
+      });
+      
+      return sprite;
+    } else {
+      // Fallback to basic icon approach
+      return this.createBasicIconSprite(iconText, towerColor);
+    }
+  }
+  
+  // Create a basic icon texture for fallback
+  createBasicIconTexture(material, iconText, towerColor) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Fill with transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, 128, 128);
+    
+    // Draw the icon text
+    ctx.font = '80px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(iconText, 64, 64);
+    
+    // Create a glowing halo effect
+    const gradient = ctx.createRadialGradient(64, 64, 20, 64, 64, 64);
+    gradient.addColorStop(0, `rgba(${new THREE.Color(towerColor).r * 255}, ${new THREE.Color(towerColor).g * 255}, ${new THREE.Color(towerColor).b * 255}, 0.7)`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+    
+    // Update material with new texture
+    material.map = new THREE.CanvasTexture(canvas);
+    material.needsUpdate = true;
+  }
+  
+  // Create a basic icon sprite for fallback
+  createBasicIconSprite(iconText, towerColor) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Fill with transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, 128, 128);
+    
+    // Draw the icon
+    ctx.font = '80px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(iconText, 64, 64);
+    
+    // Create a glowing halo effect
+    const gradient = ctx.createRadialGradient(64, 64, 20, 64, 64, 64);
+    gradient.addColorStop(0, `rgba(${new THREE.Color(towerColor).r * 255}, ${new THREE.Color(towerColor).g * 255}, ${new THREE.Color(towerColor).b * 255}, 0.7)`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+    
+    // Create texture and material
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      blending: THREE.AdditiveBlending
+    });
+    
+    // Create sprite
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.0, 1.0, 1);
+    
+    return sprite;
+  }
+  
   update(deltaTime, enemyManager) {
     const currentTime = performance.now() / 1000;
     
     // Update path marker animations
     this.updatePathMarkers(deltaTime);
+    
+    // Update tower icon animations
+    this.updateTowerAnimations(deltaTime);
     
     for (const tower of this.towers) {
       // Find target if none exists or current target is dead/gone
@@ -282,31 +444,43 @@ export class TowerManager {
   }
   
   aimTurret(tower, target) {
-    // Get direction to target
-    const towerPosition = tower.mesh.position.clone();
-    const targetPosition = target.mesh.position.clone();
-    
-    // Calculate angle to target (in XZ plane)
-    const dx = targetPosition.x - towerPosition.x;
-    const dz = targetPosition.z - towerPosition.z;
-    const angle = Math.atan2(dx, dz);
-    
-    // Rotate turret
-    tower.turret.rotation.y = angle;
+    // No physical rotation needed for a 2D icon
+    // The firing line will show the aim direction
   }
   
   fireTower(tower, target, enemyManager) {
-    // Get turret position
-    const turretPosition = tower.turret.localToWorld(new THREE.Vector3(0, 0, 0.5));
+    // Get icon position (center of the tower)
+    const towerPosition = tower.mesh.position.clone();
+    towerPosition.y += 0.5; // Adjust to match icon height
     
     // Create line from tower to target
     const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-      turretPosition,
+      towerPosition,
       target.mesh.position.clone()
     ]);
     
+    let lineColor;
+    
+    // Different colors based on tower type
+    switch(tower.type) {
+      case 4: // Lightning
+        lineColor = 0xffff00; // Yellow
+        break;
+      case 6: // Plasma
+        lineColor = 0x9900ff; // Purple
+        break;
+      case 7: // Laser
+        lineColor = 0xff0000; // Red
+        break;
+      case 12: // Supernova
+        lineColor = 0xff00ff; // Magenta
+        break;
+      default:
+        lineColor = 0x00ffff; // Cyan
+    }
+    
     const lineMaterial = new THREE.LineBasicMaterial({ 
-      color: 0xffff00,
+      color: lineColor,
       transparent: true,
       opacity: 0.8
     });
@@ -364,5 +538,39 @@ export class TowerManager {
         }
       }
     });
+  }
+  
+  // Add a new method to update tower animations
+  updateTowerAnimations(deltaTime) {
+    const currentTime = performance.now() / 1000;
+    
+    for (const tower of this.towers) {
+      // Find the glow mesh in the tower
+      const glowMesh = tower.mesh.children.find(child => 
+        child.userData.pulseTime !== undefined);
+      
+      if (glowMesh) {
+        // Update pulse time
+        glowMesh.userData.pulseTime += deltaTime;
+        
+        // Calculate scale based on sine wave
+        const pulseScale = 1 + 0.2 * Math.sin(glowMesh.userData.pulseTime * 2);
+        
+        // Apply scale to glow
+        glowMesh.scale.set(pulseScale, pulseScale, 1);
+        
+        // Animate opacity
+        if (glowMesh.material) {
+          glowMesh.material.opacity = 0.1 + 0.2 * Math.abs(Math.sin(glowMesh.userData.pulseTime * 2));
+        }
+      }
+      
+      // Also pulse the icon sprite
+      const iconSprite = tower.turret;
+      if (iconSprite) {
+        const pulseAmount = 0.05 * Math.sin(currentTime * 3);
+        iconSprite.scale.set(1.0 + pulseAmount, 1.0 + pulseAmount, 1);
+      }
+    }
   }
 } 

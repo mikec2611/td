@@ -114,14 +114,14 @@
       top: 50%;
       left: 10px;
       transform: translateY(-50%);
-      width: 70px;
+      width: 150px; /* Wider to accommodate two columns */
       max-height: 80vh;
       background-color: rgba(0, 0, 0, 0.6);
       border-radius: 8px;
       z-index: 20;
       padding: 10px;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* Two columns */
       gap: 8px;
       overflow-y: auto;
     }
@@ -137,6 +137,7 @@
       align-items: center;
       position: relative;
       transition: all 0.2s ease;
+      margin: 0 auto; /* Center in grid cell */
     }
     
     .tower-option:hover, .tower-option.selected {
@@ -151,9 +152,18 @@
       box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
     }
     
-    .tower-option img {
-      max-width: 80%;
-      max-height: 80%;
+    .tower-icon-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 80%;
+      height: 80%;
+    }
+    
+    .tower-icon-wrapper svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
     }
     
     .tower-cost {
@@ -170,7 +180,7 @@
     /* Tower Stats Tooltip */
     #tower-stats {
       position: absolute;
-      left: 100px;
+      left: 180px; /* Increased to account for wider tower selection panel */
       top: 50%;
       transform: translateY(-50%);
       background-color: rgba(0, 0, 0, 0.8);
@@ -217,55 +227,259 @@
     .speed-value {
       color: #55ff55;
     }
+    
+    #tower-description {
+      font-size: 0.9em;
+      color: #ddd;
+      margin-top: 8px;
+      line-height: 1.3;
+    }
+
+    /* Faction Selection Screen */
+    #faction-selection {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, #000428, #004e92);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: opacity 1s ease;
+    }
+
+    #faction-selection h1 {
+      color: white;
+      font-size: 3rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+
+    .faction-cards {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      padding: 0 2rem;
+    }
+
+    .faction-card {
+      width: 280px;
+      height: 380px;
+      background-color: rgba(20, 20, 30, 0.8);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      position: relative;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .faction-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .faction-header {
+      height: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .faction-image {
+      height: 180px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .faction-image svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .faction-description {
+      padding: 1rem;
+      color: #ccc;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .faction-special {
+      padding: 0 1rem 1rem;
+      color: white;
+    }
+
+    .faction-special h3 {
+      font-size: 1rem;
+      margin: 0 0 0.5rem 0;
+      color: #ffcc00;
+    }
+
+    .faction-special p {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin: 0;
+    }
+
+    /* Tech Faction */
+    .faction-tech .faction-header {
+      background: linear-gradient(to right, #0072ff, #00c6ff);
+    }
+
+    .faction-tech {
+      border: 2px solid #00c6ff;
+    }
+
+    /* Energy Faction */
+    .faction-energy .faction-header {
+      background: linear-gradient(to right, #f5d020, #f53803);
+    }
+
+    .faction-energy {
+      border: 2px solid #f5d020;
+    }
+
+    /* Elemental Faction */
+    .faction-elemental .faction-header {
+      background: linear-gradient(to right, #56ab2f, #a8e063);
+    }
+
+    .faction-elemental {
+      border: 2px solid #a8e063;
+    }
+
+    #game-container {
+      display: none;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
   </style>
 </head>
 <body>
-  <div id="notification-area"></div>
-  <div id="hud">
-    <div>Money: <span id="money">100</span></div>
-    <div>Lives: <span id="lives">10</span></div>
-    <div>Wave: <span id="wave">1</span></div>
+  <!-- Faction Selection Screen -->
+  <div id="faction-selection">
+    <h1>Choose Your Faction</h1>
+    <div class="faction-cards">
+      <div class="faction-card faction-tech" data-faction="tech">
+        <div class="faction-header">Tech Dominion</div>
+        <div class="faction-image">
+          <svg viewBox="0 0 200 200">
+            <rect x="50" y="50" width="100" height="100" fill="#0088ff" opacity="0.7" />
+            <circle cx="100" cy="100" r="40" fill="none" stroke="#00c6ff" stroke-width="5" />
+            <line x1="60" y1="60" x2="140" y2="140" stroke="#00c6ff" stroke-width="5" />
+            <line x1="140" y1="60" x2="60" y2="140" stroke="#00c6ff" stroke-width="5" />
+            <circle cx="100" cy="100" r="20" fill="#00c6ff" opacity="0.5" />
+          </svg>
+        </div>
+        <div class="faction-description">
+          Advanced technological towers harnessing precision engineering and superior firepower. These towers excel in targeting efficiency and range.
+        </div>
+        <div class="faction-special">
+          <h3>Special Ability</h3>
+          <p>Towers gain efficiency when placed in geometric patterns, increasing damage output by 15%.</p>
+        </div>
+      </div>
+      
+      <div class="faction-card faction-energy" data-faction="energy">
+        <div class="faction-header">Energy Nexus</div>
+        <div class="faction-image">
+          <svg viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="50" fill="#f5d020" opacity="0.5" />
+            <path d="M100,50 L120,90 L160,100 L120,110 L100,150 L80,110 L40,100 L80,90 Z" fill="#f53803" />
+            <circle cx="100" cy="100" r="20" fill="#f5d020" opacity="0.8" />
+            <circle cx="100" cy="100" r="10" fill="#ffffff" />
+          </svg>
+        </div>
+        <div class="faction-description">
+          Energy-based towers utilizing plasma, lightning, and charged particle weapons. These towers deal massive damage with spectacular visual effects.
+        </div>
+        <div class="faction-special">
+          <h3>Special Ability</h3>
+          <p>Energy towers can chain attacks between enemies, with each jump dealing 75% of the previous damage.</p>
+        </div>
+      </div>
+      
+      <div class="faction-card faction-elemental" data-faction="elemental">
+        <div class="faction-header">Elemental Order</div>
+        <div class="faction-image">
+          <svg viewBox="0 0 200 200">
+            <path d="M100,40 C130,60 150,80 160,100 C150,120 130,140 100,160 C70,140 50,120 40,100 C50,80 70,60 100,40 Z" fill="#56ab2f" opacity="0.7" />
+            <path d="M100,60 C120,75 130,85 140,100 C130,115 120,125 100,140 C80,125 70,115 60,100 C70,85 80,75 100,60 Z" fill="#a8e063" opacity="0.7" />
+            <circle cx="100" cy="100" r="20" fill="#ffffff" opacity="0.3" />
+          </svg>
+        </div>
+        <div class="faction-description">
+          Nature-inspired towers harnessing the power of elements. These versatile towers provide area damage and status effects against enemies.
+        </div>
+        <div class="faction-special">
+          <h3>Special Ability</h3>
+          <p>Elemental towers apply slowing effects to enemies, reducing their speed by 25% for 3 seconds.</p>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="game-info">
-    <div>Build towers to create a maze</div>
-    <div>Defend against incoming waves</div>
+
+  <!-- Game Container (will be shown after faction selection) -->
+  <div id="game-container">
+    <div id="notification-area"></div>
+    <div id="hud">
+      <div>Money: <span id="money">100</span></div>
+      <div>Lives: <span id="lives">10</span></div>
+      <div>Wave: <span id="wave">1</span></div>
+    </div>
+    <div id="game-info">
+      <div>Build towers to create a maze</div>
+      <div>Defend against incoming waves</div>
+    </div>
+    
+    <!-- Tower Selection Panel -->
+    <div id="tower-selection-panel">
+      <!-- Tower options will be added dynamically via JavaScript -->
+    </div>
+    
+    <!-- Tower Stats Tooltip -->
+    <div id="tower-stats">
+      <h3 id="tower-name">Tower Name</h3>
+      <div class="stat-row">
+        <span class="stat-label">Cost:</span>
+        <span class="stat-value" id="tower-cost-stat">$20</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Damage:</span>
+        <span class="stat-value damage-value" id="tower-damage-stat">20</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Range:</span>
+        <span class="stat-value range-value" id="tower-range-stat">4</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Fire Rate:</span>
+        <span class="stat-value speed-value" id="tower-fire-rate-stat">1.0</span>
+      </div>
+      <p id="tower-description">A basic tower with balanced stats.</p>
+    </div>
+    
+    <div id="build-controls">
+      <button id="toggle-range">Show Range</button>
+      <button id="toggle-path">Show Path</button>
+      <button id="start-wave">Start Wave</button>
+    </div>
+    <div id="dev-mode">
+      <button id="toggle-dev-mode">DEV MODE</button>
+    </div>
   </div>
   
-  <!-- Tower Selection Panel -->
-  <div id="tower-selection-panel">
-    <!-- Tower options will be added dynamically via JavaScript -->
-  </div>
-  
-  <!-- Tower Stats Tooltip -->
-  <div id="tower-stats">
-    <h3 id="tower-name">Tower Name</h3>
-    <div class="stat-row">
-      <span class="stat-label">Cost:</span>
-      <span class="stat-value" id="tower-cost-stat">$20</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Damage:</span>
-      <span class="stat-value damage-value" id="tower-damage-stat">20</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Range:</span>
-      <span class="stat-value range-value" id="tower-range-stat">4</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Fire Rate:</span>
-      <span class="stat-value speed-value" id="tower-fire-rate-stat">1.0</span>
-    </div>
-    <p id="tower-description">Description of the tower and any special abilities.</p>
-  </div>
-  
-  <div id="build-controls">
-    <button id="toggle-range">Show Range</button>
-    <button id="toggle-path">Show Path</button>
-    <button id="start-wave">Start Wave</button>
-  </div>
-  <div id="dev-mode">
-    <button id="toggle-dev-mode">DEV MODE</button>
-  </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
