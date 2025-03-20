@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tower Defense</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background-color: #000;
+      cursor: pointer;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+    }
+    #build-controls {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 5px;
+      color: white;
+      z-index: 10;
+    }
+    #build-controls button {
+      margin: 5px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-active {
+      background-color: #4CAF50;
+      color: white;
+    }
+    #game-title {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-size: 1.2em;
+      font-weight: bold;
+      z-index: 10;
+    }
+    /* Game Info Box */
+    #game-info {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      color: white;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 5px;
+      text-align: right;
+      z-index: 10;
+    }
+    /* Developer Mode Toggle */
+    #dev-mode {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 5px;
+      z-index: 10;
+    }
+    #dev-mode button {
+      background-color: #333;
+      color: #999;
+      border: 1px solid #666;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #dev-mode button.active {
+      background-color: #990000;
+      color: white;
+      border: 1px solid #ff0000;
+    }
+    #hud, #build-controls, #game-title, #game-info, #dev-mode {
+      /* cursor: default; */ /* Removed to make everything a pointer */
+    }
+    button {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-title">Tower Defense</div>
+  <div id="hud">
+    <div>Money: <span id="money">100</span></div>
+    <div>Lives: <span id="lives">10</span></div>
+    <div>Wave: <span id="wave">1</span></div>
+  </div>
+  <div id="game-info">
+    <div>Build towers to create a maze</div>
+    <div>Defend against incoming waves</div>
+  </div>
+  <div id="build-controls">
+    <button id="build-tower">Build Tower ($20)</button>
+    <button id="toggle-range">Show Range</button>
+    <button id="toggle-path">Show Path</button>
+    <button id="start-wave">Start Wave</button>
+  </div>
+  <div id="dev-mode">
+    <button id="toggle-dev-mode">DEV MODE</button>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html> 
