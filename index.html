@@ -254,9 +254,47 @@
     #faction-selection h1 {
       color: white;
       font-size: 3rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       text-align: center;
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+
+    .game-instructions {
+      color: #ddd;
+      font-size: 1.1rem;
+      text-align: center;
+      max-width: 800px;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+      background-color: rgba(0, 0, 0, 0.3);
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .start-game-btn {
+      margin-top: 2rem;
+      padding: 1rem 2.5rem;
+      font-size: 1.4rem;
+      font-weight: bold;
+      background: linear-gradient(to right, #00b09b, #96c93d);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .start-game-btn.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .start-game-btn.active:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
     }
 
     .faction-cards {
@@ -370,6 +408,12 @@
   <!-- Faction Selection Screen -->
   <div id="faction-selection">
     <h1>Choose Your Faction</h1>
+    
+    <div class="game-instructions">
+      Build towers to defend against waves of enemies. Place towers strategically to create a maze and block enemy paths. 
+      Upgrade to stronger towers as you earn money from defeating enemies. Every 30 seconds, a new wave will automatically spawn!
+    </div>
+    
     <div class="faction-cards">
       <div class="faction-card faction-tech" data-faction="tech">
         <div class="faction-header">Tech Dominion</div>
@@ -384,10 +428,6 @@
         </div>
         <div class="faction-description">
           Advanced technological towers harnessing precision engineering and superior firepower. These towers excel in targeting efficiency and range.
-        </div>
-        <div class="faction-special">
-          <h3>Special Ability</h3>
-          <p>Towers gain efficiency when placed in geometric patterns, increasing damage output by 15%.</p>
         </div>
       </div>
       
@@ -404,10 +444,6 @@
         <div class="faction-description">
           Energy-based towers utilizing plasma, lightning, and charged particle weapons. These towers deal massive damage with spectacular visual effects.
         </div>
-        <div class="faction-special">
-          <h3>Special Ability</h3>
-          <p>Energy towers can chain attacks between enemies, with each jump dealing 75% of the previous damage.</p>
-        </div>
       </div>
       
       <div class="faction-card faction-elemental" data-faction="elemental">
@@ -422,12 +458,10 @@
         <div class="faction-description">
           Nature-inspired towers harnessing the power of elements. These versatile towers provide area damage and status effects against enemies.
         </div>
-        <div class="faction-special">
-          <h3>Special Ability</h3>
-          <p>Elemental towers apply slowing effects to enemies, reducing their speed by 25% for 3 seconds.</p>
-        </div>
       </div>
     </div>
+    
+    <button id="start-game-btn" class="start-game-btn">Start Game</button>
   </div>
 
   <!-- Game Container (will be shown after faction selection) -->

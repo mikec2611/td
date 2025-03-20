@@ -7,13 +7,16 @@ import { TOWER_TYPES } from './TowerTypes.js';
 // Game settings
 const GRID_SIZE = 15; // Grid is 15x15
 const CELL_SIZE = 2; // Each cell is 2x2 units
+const WAVE_INTERVAL = 30000; // 30 seconds between waves
 
 // Track selected faction
 let selectedFaction = null;
+let waveTimer = null;
 
 // Initialize the faction selection screen
 function initFactionSelection() {
   const factionCards = document.querySelectorAll('.faction-card');
+  const startGameBtn = document.getElementById('start-game-btn');
   
   factionCards.forEach(card => {
     card.addEventListener('click', () => {
@@ -23,21 +26,29 @@ function initFactionSelection() {
       factionCards.forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       
-      // Add animation for transition
-      document.getElementById('faction-selection').style.opacity = '0';
-      setTimeout(() => {
-        document.getElementById('faction-selection').style.display = 'none';
-        document.getElementById('game-container').style.display = 'block';
-        
-        // Fade in game container
-        setTimeout(() => {
-          document.getElementById('game-container').style.opacity = '1';
-        }, 50);
-        
-        // Initialize the game after faction selection
-        initGame(selectedFaction);
-      }, 1000);
+      // Enable the start game button
+      startGameBtn.classList.add('active');
     });
+  });
+  
+  // Add event listener to the start game button
+  startGameBtn.addEventListener('click', () => {
+    if (!selectedFaction) return; // Don't proceed if no faction is selected
+    
+    // Add animation for transition
+    document.getElementById('faction-selection').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('faction-selection').style.display = 'none';
+      document.getElementById('game-container').style.display = 'block';
+      
+      // Fade in game container
+      setTimeout(() => {
+        document.getElementById('game-container').style.opacity = '1';
+      }, 50);
+      
+      // Initialize the game after faction selection
+      initGame(selectedFaction);
+    }, 1000);
   });
 }
 
@@ -194,9 +205,13 @@ function initGame(faction) {
     }
   });
   
-  document.getElementById('start-wave').addEventListener('click', () => {
-    gameManager.startWave();
-  });
+  // Change start wave button to show next wave countdown
+  const startWaveBtn = document.getElementById('start-wave');
+  startWaveBtn.textContent = 'Wave Starting Soon...';
+  startWaveBtn.disabled = true;
+  
+  // Setup automatic wave spawning
+  setupAutoWaveSpawning(gameManager, startWaveBtn);
   
   // Animation loop
   function animate() {
@@ -208,6 +223,42 @@ function initGame(faction) {
   }
   
   animate();
+}
+
+// Setup automatic wave spawning
+function setupAutoWaveSpawning(gameManager, startWaveBtn) {
+  let countdown = WAVE_INTERVAL / 1000;
+  
+  // Update the button to show countdown
+  const updateCountdown = () => {
+    startWaveBtn.textContent = `Next Wave: ${countdown}s`;
+  };
+  
+  // Call immediately to set initial text
+  updateCountdown();
+  
+  // Start the countdown
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    updateCountdown();
+    
+    if (countdown <= 0) {
+      clearInterval(countdownInterval); // Clear this interval
+      gameManager.startWave(); // Start the wave
+      
+      // Reset the countdown for the next wave
+      setTimeout(() => {
+        countdown = WAVE_INTERVAL / 1000;
+        updateCountdown();
+        
+        // Restart the interval for next wave
+        setupAutoWaveSpawning(gameManager, startWaveBtn);
+      }, 3000); // Give a short delay after wave starts
+    }
+  }, 1000);
+  
+  // Store the timer reference so it can be cleared if needed
+  waveTimer = countdownInterval;
 }
 
 // Apply faction-specific theme to the game
