@@ -147,6 +147,11 @@ export class EnemyManager {
   
   // Helper method to check if the wave is complete
   checkWaveCompletion() {
+    // If wave is not in progress, don't check
+    if (!this.waveInProgress) {
+      return;
+    }
+    
     // Wave is complete if all enemies have been spawned and all have been processed
     // (either killed or reached the end)
     const totalProcessed = this.enemiesKilled + this.enemiesReachedEnd;

@@ -4,6 +4,9 @@ import { TowerManager } from './TowerManager.js';
 import { GameManager } from './GameManager.js';
 import { TOWER_TYPES } from './TowerTypes.js';
 
+// Global variables to track game instances
+let gridManager, enemyManager, towerManager, gameManager, scene;
+
 // Game settings
 const GRID_SIZE = 15; // Grid is 15x15
 const CELL_SIZE = 2; // Each cell is 2x2 units
@@ -60,8 +63,16 @@ function initFactionSelection() {
 function initGame(faction) {
   console.log(`Starting game with faction: ${faction}`);
   
+  // Reset game state variables
+  isFirstWave = true;
+  currentWave = 0;
+  if (waveTimer) {
+    clearInterval(waveTimer);
+    waveTimer = null;
+  }
+  
   // Initialize three.js
-  const scene = new THREE.Scene();
+  scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb); // Sky blue background
   
   // Create a static camera with field of view calculated to show the entire board
@@ -108,11 +119,17 @@ function initGame(faction) {
   // Apply faction-specific styling and effects
   applyFactionTheme(faction, scene);
   
-  // Initialize game managers
-  const gridManager = new GridManager(scene, GRID_SIZE, CELL_SIZE);
-  const enemyManager = new EnemyManager(scene, gridManager);
-  const towerManager = new TowerManager(scene, gridManager);
-  const gameManager = new GameManager(gridManager, enemyManager, towerManager);
+  // Initialize grid manager
+  gridManager = new GridManager(scene, GRID_SIZE, CELL_SIZE);
+  
+  // Create enemy manager
+  enemyManager = new EnemyManager(scene, gridManager);
+  
+  // Create tower manager
+  towerManager = new TowerManager(scene, gridManager);
+  
+  // Create game manager and pass other managers
+  gameManager = new GameManager(gridManager, enemyManager, towerManager);
   
   // Initialize path visualization
   const initialPath = gridManager.getPath();
@@ -221,6 +238,9 @@ function initGame(faction) {
   // Setup wave completion handler for subsequent waves
   setupWaveCompletionHandler(gameManager);
   
+  // Make waveTimer accessible to GameManager
+  window.waveTimer = waveTimer;
+  
   // Animation loop
   function animate() {
     requestAnimationFrame(animate);
@@ -269,13 +289,14 @@ function setupAutoWaveSpawning(gameManager) {
     
     // Store the timer reference so it can be cleared if needed
     waveTimer = countdownInterval;
+    window.waveTimer = waveTimer;
   }
 }
 
 // Setup wave completion handler
 function setupWaveCompletionHandler(gameManager) {
-  // Listen for wave completion event
-  document.addEventListener('waveCompleted', (event) => {
+  // Create a handler function and store it globally so it can be removed later
+  window.onWaveCompletedHandler = (event) => {
     console.log('Wave completed event received');
     if (currentWave >= MAX_WAVES) {
       // Final wave completed
@@ -286,7 +307,10 @@ function setupWaveCompletionHandler(gameManager) {
     
     // Set a timer for the next wave
     startNextWaveCountdown(gameManager, NEXT_WAVE_DELAY);
-  });
+  };
+
+  // Listen for wave completion event
+  document.addEventListener('waveCompleted', window.onWaveCompletedHandler);
 }
 
 // Function to start countdown for next wave
@@ -319,6 +343,7 @@ function startNextWaveCountdown(gameManager, delay) {
   
   // Store the timer reference
   waveTimer = countdownInterval;
+  window.waveTimer = waveTimer;
 }
 
 // Apply faction-specific theme to the game
@@ -445,6 +470,151 @@ function setupTowerSelectionPanel(towerManager, faction) {
     panel.appendChild(towerOption);
   });
 }
+
+// Reset all game elements when returning to faction selection
+window.resetGame = function() {
+  console.log("Resetting game state completely");
+
+  // Clear the scene
+  if (scene) {
+    // Remove all objects from the scene
+    while(scene.children.length > 0) {
+      const object = scene.children[0];
+      if (object.geometry) object.geometry.dispose();
+      if (object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach(material => material.dispose());
+        } else {
+          object.material.dispose();
+        }
+      }
+      scene.remove(object);
+    }
+  }
+  
+  // Reset game state
+  if (window.waveTimer) {
+    clearInterval(window.waveTimer);
+    window.waveTimer = null;
+  }
+  
+  // Reset all managers
+  if (enemyManager) {
+    // Stop any ongoing wave
+    enemyManager.waveInProgress = false;
+    if (enemyManager.spawnInterval) {
+      clearInterval(enemyManager.spawnInterval);
+      enemyManager.spawnInterval = null;
+    }
+  
+    // Clear enemies array
+    enemyManager.enemies = [];
+  }
+  
+  if (gameManager) {
+    // Remove event listeners that were bound in the GameManager constructor
+    document.removeEventListener('enemyReachedEnd', gameManager.onEnemyReachedEndBound);
+    document.removeEventListener('enemyKilled', gameManager.onEnemyKilledBound);
+    document.removeEventListener('waveCompleted', gameManager.onWaveCompletedBound);
+    document.removeEventListener('pathChanged', gameManager.onPathChangedBound);
+    
+    // Also remove our global wave completed handler if it exists
+    if (window.onWaveCompletedHandler) {
+      document.removeEventListener('waveCompleted', window.onWaveCompletedHandler);
+      window.onWaveCompletedHandler = null;
+    }
+    
+    gameManager.gameIsOver = false;
+  }
+  
+  // Reset game variables
+  isFirstWave = true;
+  currentWave = 0;
+  selectedFaction = null;
+  
+  // Properly reset the faction selection screen layout
+  const factionSelection = document.getElementById('faction-selection');
+  if (factionSelection) {
+    // Reset position and style properties
+    factionSelection.style.position = 'fixed';
+    factionSelection.style.top = '0';
+    factionSelection.style.left = '0';
+    factionSelection.style.width = '100%';
+    factionSelection.style.height = '100%';
+    factionSelection.style.display = 'flex';
+    factionSelection.style.flexDirection = 'column';
+    factionSelection.style.justifyContent = 'center';
+    factionSelection.style.alignItems = 'center';
+  }
+  
+  // Reset game instructions
+  const gameInstructions = document.querySelector('.game-instructions');
+  if (gameInstructions) {
+    gameInstructions.style.textAlign = 'center';
+    gameInstructions.style.maxWidth = '800px';
+    gameInstructions.style.marginBottom = '1.5rem';
+    gameInstructions.style.width = 'auto'; // Reset any explicit width
+    gameInstructions.style.left = 'auto'; // Reset any left positioning
+  }
+  
+  // Reset start game button
+  const startGameBtn = document.getElementById('start-game-btn');
+  if (startGameBtn) {
+    startGameBtn.style.marginTop = '2rem';
+    startGameBtn.style.position = 'relative';
+    startGameBtn.style.left = 'auto';
+    startGameBtn.style.width = 'auto';
+    startGameBtn.classList.remove('active');
+  }
+  
+  // Reset faction selection UI state
+  const factionCards = document.querySelectorAll('.faction-card');
+  factionCards.forEach(card => {
+    card.classList.remove('selected');
+  });
+  
+  // Clear any notifications
+  const notificationArea = document.getElementById('notification-area');
+  if (notificationArea) {
+    notificationArea.textContent = '';
+  }
+  
+  // Reset towers panel
+  const towersPanel = document.getElementById('tower-selection');
+  if (towersPanel) {
+    towersPanel.innerHTML = '';
+  }
+  
+  // Reset HUD values
+  document.getElementById('money').textContent = '100';
+  document.getElementById('lives').textContent = '10';
+  document.getElementById('wave').textContent = '1';
+  
+  // Remove any game over screen that might still be around
+  const gameOverScreen = document.getElementById('game-over-screen');
+  if (gameOverScreen && gameOverScreen.parentNode) {
+    gameOverScreen.parentNode.removeChild(gameOverScreen);
+  }
+  
+  // Clear any THREE.js renderer from the container
+  const gameContainer = document.getElementById('game-container');
+  if (gameContainer) {
+    // Remove any WebGL canvas that might be in the container
+    const canvas = gameContainer.querySelector('canvas');
+    if (canvas) {
+      gameContainer.removeChild(canvas);
+    }
+  }
+  
+  // Null out global references to encourage garbage collection
+  gridManager = null;
+  enemyManager = null;
+  towerManager = null;
+  gameManager = null;
+  scene = null;
+  
+  console.log("Game reset complete");
+};
 
 // Start the game with faction selection
 document.addEventListener('DOMContentLoaded', initFactionSelection); 

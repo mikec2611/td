@@ -6,8 +6,8 @@ export class GameManager {
     
     this.money = 100;
     this.lives = 10;
-    this.score = 0;
     this.waveNumber = 1;
+    this.gameIsOver = false;
     
     // Enemy wave configuration
     this.enemySpawnCount = 10; // Base number of enemies per wave
@@ -28,11 +28,17 @@ export class GameManager {
     this.gameInfoDisplay = document.getElementById('game-info') || document.createElement('div');
     this.notificationArea = document.getElementById('notification-area');
     
+    // Store bound methods for event listeners to enable proper cleanup
+    this.onEnemyReachedEndBound = this.onEnemyReachedEnd.bind(this);
+    this.onEnemyKilledBound = this.onEnemyKilled.bind(this);
+    this.onWaveCompletedBound = this.onWaveCompleted.bind(this);
+    this.onPathChangedBound = this.onPathChanged.bind(this);
+    
     // Event listeners
-    document.addEventListener('enemyReachedEnd', this.onEnemyReachedEnd.bind(this));
-    document.addEventListener('enemyKilled', this.onEnemyKilled.bind(this));
-    document.addEventListener('waveCompleted', this.onWaveCompleted.bind(this));
-    document.addEventListener('pathChanged', this.onPathChanged.bind(this));
+    document.addEventListener('enemyReachedEnd', this.onEnemyReachedEndBound);
+    document.addEventListener('enemyKilled', this.onEnemyKilledBound);
+    document.addEventListener('waveCompleted', this.onWaveCompletedBound);
+    document.addEventListener('pathChanged', this.onPathChangedBound);
     
     // Developer mode toggle
     const devModeButton = document.getElementById('toggle-dev-mode');
@@ -224,6 +230,9 @@ export class GameManager {
   }
   
   onEnemyReachedEnd() {
+    // If game is already over, don't process
+    if (this.gameIsOver) return;
+    
     this.lives--;
     this.updateUI();
     
@@ -237,32 +246,26 @@ export class GameManager {
     
     // Award money based on enemy type
     let baseReward = 10;
-    let scoreValue = 100;
     
     switch(enemyType) {
       case 'fast':
         baseReward = 15;
-        scoreValue = 150;
         break;
         
       case 'tough':
         baseReward = 20;
-        scoreValue = 200;
         break;
         
       case 'armored':
         baseReward = 25;
-        scoreValue = 300;
         break;
         
       case 'boss':
         baseReward = 50;
-        scoreValue = 500;
         break;
         
       case 'elite':
         baseReward = 40;
-        scoreValue = 400;
         break;
     }
     
@@ -272,9 +275,6 @@ export class GameManager {
     
     // Award money
     this.money += rewardAmount;
-    
-    // Add score
-    this.score += scoreValue + (this.waveNumber * 10);
     
     // Show quick notification for special enemy types
     if (enemyType !== 'normal') {
@@ -288,7 +288,6 @@ export class GameManager {
     // Award completion bonus
     const waveCompletionBonus = 50 + (event.detail.waveNumber * 20);
     this.money += waveCompletionBonus;
-    this.score += waveCompletionBonus;
     
     this.waveNumber = event.detail.nextWaveNumber;
     this.updateUI();
@@ -330,10 +329,151 @@ export class GameManager {
   }
   
   gameOver() {
-    this.showNotification(`Game Over! Your score: ${this.score}`, '#ff0000');
+    // Prevent multiple calls to gameOver
+    if (this.gameIsOver) return;
+    this.gameIsOver = true;
+
+    console.log("Game over triggered - stopping all game activities");
+    
+    // Stop all enemy and wave activity
+    if (this.enemyManager) {
+      this.enemyManager.waveInProgress = false;
+      
+      // Clear any spawn intervals
+      if (this.enemyManager.spawnInterval) {
+        clearInterval(this.enemyManager.spawnInterval);
+        this.enemyManager.spawnInterval = null;
+      }
+      
+      // Clear all active enemies
+      while (this.enemyManager.enemies.length > 0) {
+        const enemy = this.enemyManager.enemies[0];
+        this.enemyManager.scene.remove(enemy.mesh);
+        this.enemyManager.enemies.shift();
+      }
+    }
+    
+    // Clear any wave timers in main.js
+    if (window.waveTimer) {
+      clearInterval(window.waveTimer);
+      window.waveTimer = null;
+    }
+    
+    // Stop event listeners - remove our bound event listeners
+    document.removeEventListener('enemyReachedEnd', this.onEnemyReachedEndBound);
+    document.removeEventListener('enemyKilled', this.onEnemyKilledBound);
+    document.removeEventListener('waveCompleted', this.onWaveCompletedBound);
+    document.removeEventListener('pathChanged', this.onPathChangedBound);
+    
+    // Remove global wave handler if it exists
+    if (window.onWaveCompletedHandler) {
+      document.removeEventListener('waveCompleted', window.onWaveCompletedHandler);
+    }
+    
+    this.showNotification(`Game Over! You reached wave: ${this.waveNumber}`, '#ff0000');
+    
+    // Check if a game over screen already exists and remove it
+    const existingGameOverScreen = document.getElementById('game-over-screen');
+    if (existingGameOverScreen) {
+      existingGameOverScreen.remove();
+    }
+    
+    // Create game over screen
+    const gameOverScreen = document.createElement('div');
+    gameOverScreen.id = 'game-over-screen';
+    
+    // Game over title
+    const gameOverTitle = document.createElement('h1');
+    gameOverTitle.textContent = 'GAME OVER';
+    
+    // Wave reached message
+    const waveMessage = document.createElement('p');
+    waveMessage.textContent = `You reached wave: ${this.waveNumber}`;
+    
+    // Play again button
+    const playAgainButton = document.createElement('button');
+    playAgainButton.textContent = 'Play Again';
+    playAgainButton.className = 'play-again-btn';
+    
+    // Add event listener to the play again button
+    playAgainButton.addEventListener('click', () => {
+      // Hide game over screen
+      gameOverScreen.style.opacity = '0';
+      setTimeout(() => {
+        // Remove game over screen safely
+        if (gameOverScreen.parentNode) {
+          gameOverScreen.parentNode.removeChild(gameOverScreen);
+        } else {
+          // If element is already detached, just make sure it's not visible
+          gameOverScreen.style.display = 'none';
+        }
+        
+        // Reset game container
+        document.getElementById('game-container').style.opacity = '0';
+        setTimeout(() => {
+          document.getElementById('game-container').style.display = 'none';
+          
+          // Get faction selection element
+          const factionSelection = document.getElementById('faction-selection');
+          
+          // Reset faction selection screen styles before showing it
+          if (factionSelection) {
+            // First set display to block but opacity to 0 for proper transition
+            factionSelection.style.display = 'flex';
+            factionSelection.style.opacity = '0';
+            factionSelection.style.position = 'fixed';
+            factionSelection.style.top = '0';
+            factionSelection.style.left = '0';
+            factionSelection.style.width = '100%';
+            factionSelection.style.height = '100%';
+            factionSelection.style.flexDirection = 'column';
+            factionSelection.style.justifyContent = 'center';
+            factionSelection.style.alignItems = 'center';
+          }
+          
+          // Reset game instructions
+          const gameInstructions = document.querySelector('.game-instructions');
+          if (gameInstructions) {
+            gameInstructions.style.textAlign = 'center';
+            gameInstructions.style.maxWidth = '800px';
+            gameInstructions.style.marginBottom = '1.5rem';
+            gameInstructions.style.width = 'auto';
+            gameInstructions.style.left = 'auto';
+          }
+          
+          // Reset start game button
+          const startGameBtn = document.getElementById('start-game-btn');
+          if (startGameBtn) {
+            startGameBtn.style.marginTop = '2rem';
+            startGameBtn.style.position = 'relative';
+            startGameBtn.style.left = 'auto';
+            startGameBtn.style.width = 'auto';
+          }
+          
+          // Reset game state (cleans up event listeners, etc.)
+          window.resetGame();
+            
+          // Fade in the faction selection screen
+          setTimeout(() => {
+            if (factionSelection) {
+              factionSelection.style.opacity = '1';
+            }
+          }, 50);
+        }, 1000);
+      }, 1000);
+    });
+    
+    // Add elements to the game over screen
+    gameOverScreen.appendChild(gameOverTitle);
+    gameOverScreen.appendChild(waveMessage);
+    gameOverScreen.appendChild(playAgainButton);
+    
+    // Add game over screen to the body
+    document.body.appendChild(gameOverScreen);
+    
+    // Fade in the game over screen
     setTimeout(() => {
-      alert(`Game Over! Your score: ${this.score}`);
-      // Could implement restart functionality here
-    }, 1000);
+      gameOverScreen.style.opacity = '1';
+    }, 100);
   }
 } 
