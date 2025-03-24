@@ -4,6 +4,11 @@ export class GameManager {
     this.enemyManager = enemyManager;
     this.towerManager = towerManager;
     
+    // Set reference to this GameManager in the EnemyManager
+    if (this.enemyManager) {
+      this.enemyManager.gameManager = this;
+    }
+    
     this.money = 100;
     this.lives = 10;
     this.waveNumber = 1;
@@ -21,6 +26,7 @@ export class GameManager {
     this.infiniteGold = false;
     this.infiniteLives = false;
     this.gamePaused = false;
+    this.gameSpeed = 1.0; // Store current game speed
     this.originalEnemySpeed = this.enemyManager.enemySpeed;
     
     // UI elements
@@ -62,6 +68,8 @@ export class GameManager {
     const infiniteGoldToggle = document.getElementById('infinite-gold');
     const infiniteLivesToggle = document.getElementById('infinite-lives');
     const pauseGameBtn = document.getElementById('pause-game-btn');
+    const gameSpeedSlider = document.getElementById('game-speed');
+    const gameSpeedValue = gameSpeedSlider ? gameSpeedSlider.nextElementSibling : null;
     
     // Add event listeners
     if (infiniteGoldToggle) {
@@ -80,6 +88,24 @@ export class GameManager {
       });
     }
     
+    if (gameSpeedSlider && gameSpeedValue) {
+      // Set initial text value
+      gameSpeedValue.textContent = `${gameSpeedSlider.value}x`;
+      
+      // Add input event (while dragging)
+      gameSpeedSlider.addEventListener('input', () => {
+        const newSpeed = parseFloat(gameSpeedSlider.value);
+        gameSpeedValue.textContent = `${newSpeed.toFixed(1)}x`;
+      });
+      
+      // Add change event (after release)
+      gameSpeedSlider.addEventListener('change', () => {
+        const newSpeed = parseFloat(gameSpeedSlider.value);
+        this.setGameSpeed(newSpeed);
+        this.showNotification(`Game Speed: ${newSpeed.toFixed(1)}x`, '#ff00ff');
+      });
+    }
+    
     if (pauseGameBtn) {
       pauseGameBtn.addEventListener('click', () => {
         this.gamePaused = !this.gamePaused;
@@ -95,6 +121,150 @@ export class GameManager {
         }
       });
     }
+  }
+  
+  setGameSpeed(speed) {
+    if (!this.enemyManager) return;
+    
+    // Store the current game speed
+    const previousSpeed = this.gameSpeed;
+    this.gameSpeed = speed;
+    
+    // Adjust enemy speed based on the slider value
+    this.enemyManager.enemySpeed = this.originalEnemySpeed * speed;
+    
+    // Update existing enemies' speed - use a direct ratio of the new speed to previous speed
+    for (const enemy of this.enemyManager.enemies) {
+      // Apply the speed change as a ratio to the current enemy's speed
+      enemy.speed = enemy.speed * (speed / previousSpeed);
+    }
+    
+    // If we have an active wave timer, clear and restart it with the new speed
+    if (window.waveTimer) {
+      // Store current timer information before clearing
+      const oldTimerType = window.waveTimerType || 'unknown';
+      const remainingTime = window.waveCountdown || 0;
+      
+      // Clear existing timer
+      clearInterval(window.waveTimer);
+      
+      // If we have enough information to restart the timer
+      if (oldTimerType === 'firstWave' && remainingTime > 0) {
+        // Restart first wave timer
+        this.restartFirstWaveTimer(remainingTime);
+      } else if (oldTimerType === 'nextWave' && remainingTime > 0) {
+        // Restart next wave timer
+        this.restartNextWaveTimer(remainingTime);
+      }
+    }
+    
+    // Adjust enemy spawn interval if a wave is in progress
+    if (this.enemyManager.spawnInterval) {
+      const currentWave = this.waveNumber;
+      const enemiesRemaining = this.enemyManager.enemyCount - this.enemyManager.enemiesSpawned;
+      
+      // Clear the current spawn interval
+      clearInterval(this.enemyManager.spawnInterval);
+      
+      // Get the path
+      const path = this.gridManager.getPath();
+      if (path) {
+        // Calculate the new spawn interval based on the current wave
+        const baseSpawnInterval = 1000; // 1 second base
+        const spawnIntervalReduction = Math.min(0.7, (currentWave - 1) * 0.02);
+        const adjustedInterval = (baseSpawnInterval * (1 - spawnIntervalReduction)) / speed;
+        
+        // Setup new spawn interval with adjusted timing
+        this.enemyManager.spawnInterval = setInterval(() => {
+          this.enemyManager.spawnEnemy(path);
+          this.enemyManager.enemiesSpawned++;
+          
+          if (this.enemyManager.enemiesSpawned >= this.enemyManager.enemyCount) {
+            clearInterval(this.enemyManager.spawnInterval);
+            this.enemyManager.spawnInterval = null;
+            
+            // Check if wave is already complete
+            this.enemyManager.checkWaveCompletion();
+          }
+        }, adjustedInterval);
+      }
+    }
+  }
+  
+  // Helper to restart first wave timer with remaining time
+  restartFirstWaveTimer(remainingSeconds) {
+    const notificationArea = document.getElementById('notification-area');
+    let countdown = remainingSeconds;
+    
+    // Update countdown text
+    const updateCountdown = () => {
+      notificationArea.textContent = `First wave starting in: ${countdown}s`;
+    };
+    
+    // Set initial text
+    updateCountdown();
+    
+    // Start new countdown with speed-adjusted interval
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      updateCountdown();
+      
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        
+        // Start first wave
+        window.currentWave = 1;
+        notificationArea.textContent = `Wave ${window.currentWave}/${window.MAX_WAVES} incoming!`;
+        this.startWave(window.currentWave, window.MAX_WAVES);
+        
+        // No longer first wave
+        window.isFirstWave = false;
+        window.waveTimer = null;
+        window.waveTimerType = null;
+      }
+    }, 1000 / this.gameSpeed); // Adjust interval by game speed
+    
+    // Store the timer reference
+    window.waveTimer = countdownInterval;
+    window.waveTimerType = 'firstWave';
+    window.waveCountdown = remainingSeconds;
+  }
+  
+  // Helper to restart next wave timer with remaining time
+  restartNextWaveTimer(remainingSeconds) {
+    const notificationArea = document.getElementById('notification-area');
+    let countdown = remainingSeconds;
+    
+    // Update the notification to show the countdown
+    const updateCountdown = () => {
+      notificationArea.textContent = `Wave ${window.currentWave+1}/${window.MAX_WAVES} - Next wave in: ${countdown}s`;
+    };
+    
+    // Call immediately to set initial text
+    updateCountdown();
+    
+    // Start the countdown with adjusted interval
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      updateCountdown();
+      
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        
+        // Start the next wave
+        window.currentWave++;
+        notificationArea.textContent = `Wave ${window.currentWave}/${window.MAX_WAVES} incoming!`;
+        this.startWave(window.currentWave, window.MAX_WAVES);
+        
+        window.waveTimer = null;
+        window.waveTimerType = null;
+      }
+    }, 1000 / this.gameSpeed); // Adjust interval by game speed
+    
+    // Store the timer reference
+    window.waveTimer = countdownInterval;
+    window.waveTimerType = 'nextWave';
+    window.waveCountdown = remainingSeconds;
   }
   
   toggleDevMode() {
@@ -127,6 +297,17 @@ export class GameManager {
         }
       }
       
+      // Reset game speed to normal
+      const gameSpeedSlider = document.getElementById('game-speed');
+      if (gameSpeedSlider) {
+        gameSpeedSlider.value = 1;
+        const speedValueDisplay = gameSpeedSlider.nextElementSibling;
+        if (speedValueDisplay) {
+          speedValueDisplay.textContent = '1.0x';
+        }
+      }
+      this.setGameSpeed(1.0);
+      
       // Reset toggle switches
       const infiniteGoldToggle = document.getElementById('infinite-gold');
       const infiniteLivesToggle = document.getElementById('infinite-lives');
@@ -158,11 +339,11 @@ export class GameManager {
       // Add a slightly different background for emphasis
       this.notificationArea.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
       
-      // Set a timeout to clear the notification
+      // Set a timeout to clear the notification, adjusted by game speed
       this.notificationTimeout = setTimeout(() => {
         this.notificationArea.textContent = '';
         this.notificationArea.style.backgroundColor = this.originalNotificationBg;
-      }, 3000);
+      }, 3000 / this.gameSpeed);
     } else {
       // Fallback to creating a temporary notification if notification area doesn't exist
       const notification = document.createElement('div');
@@ -180,10 +361,10 @@ export class GameManager {
       notification.style.zIndex = '100';
       document.body.appendChild(notification);
       
-      // Remove notification after delay
+      // Remove notification after delay, adjusted by game speed
       setTimeout(() => {
         document.body.removeChild(notification);
-      }, 3000);
+      }, 3000 / this.gameSpeed);
     }
   }
   
@@ -335,7 +516,7 @@ export class GameManager {
       // Display difficulty stats after a short delay so it doesn't overlap with the main notification
       const difficultyInfo = `Enemy Stats: Health ${Math.round(healthScaling * 100)}%, Speed ${Math.round(speedScaling * 100)}%`;
       this.displayGameInfo(difficultyInfo);
-    }, 1500);
+    }, 1500 / this.gameSpeed); // Adjust timeout by game speed
   }
   
   onEnemyReachedEnd(event) {
@@ -453,12 +634,12 @@ export class GameManager {
     if (this.gameInfoDisplay) {
       this.gameInfoDisplay.textContent = message;
       
-      // Clear the message after a delay
+      // Clear the message after a delay adjusted by game speed
       setTimeout(() => {
         if (this.gameInfoDisplay) {
           this.gameInfoDisplay.textContent = '';
         }
-      }, 3000);
+      }, 3000 / this.gameSpeed);
     } else {
       console.log(message); // Fallback to console if element doesn't exist
     }

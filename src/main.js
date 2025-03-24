@@ -268,6 +268,8 @@ function setupAutoWaveSpawning(gameManager) {
     // Update the notification area to show countdown
     const updateCountdown = () => {
       notificationArea.textContent = `First wave starting in: ${countdown}s`;
+      // Store current countdown value for game speed adjustments
+      window.waveCountdown = countdown;
     };
     
     // Call immediately to set initial text
@@ -288,12 +290,17 @@ function setupAutoWaveSpawning(gameManager) {
         
         // No longer first wave
         isFirstWave = false;
+        window.waveTimer = null;
+        window.waveTimerType = null;
+        window.waveCountdown = 0;
       }
-    }, 1000);
+    }, 1000 / gameManager.gameSpeed); // Adjust by game speed
     
-    // Store the timer reference so it can be cleared if needed
+    // Store the timer reference and type so it can be adjusted with game speed
     waveTimer = countdownInterval;
     window.waveTimer = waveTimer;
+    window.waveTimerType = 'firstWave';
+    window.waveCountdown = countdown;
   }
 }
 
@@ -325,6 +332,8 @@ function startNextWaveCountdown(gameManager, delay) {
   // Update the notification to show the countdown
   const updateCountdown = () => {
     notificationArea.textContent = `Wave ${currentWave+1}/${MAX_WAVES} - Next wave in: ${countdown}s`;
+    // Store current countdown value for game speed adjustments
+    window.waveCountdown = countdown;
   };
   
   // Call immediately to set initial text
@@ -342,12 +351,18 @@ function startNextWaveCountdown(gameManager, delay) {
       currentWave++;
       notificationArea.textContent = `Wave ${currentWave}/${MAX_WAVES} incoming!`;
       gameManager.startWave(currentWave, MAX_WAVES);
+      
+      window.waveTimer = null;
+      window.waveTimerType = null;
+      window.waveCountdown = 0;
     }
-  }, 1000);
+  }, 1000 / gameManager.gameSpeed); // Adjust by game speed
   
-  // Store the timer reference
+  // Store the timer reference and type for game speed adjustments
   waveTimer = countdownInterval;
   window.waveTimer = waveTimer;
+  window.waveTimerType = 'nextWave';
+  window.waveCountdown = countdown;
 }
 
 // Apply faction-specific theme to the game

@@ -8,6 +8,7 @@ export class EnemyManager {
     this.enemiesRemaining = 0;
     this.spawnInterval = null;
     this.enemySpeed = 5.0; // Default speed increased (was 1.0)
+    this.gameManager = null; // Will be set by GameManager
     
     // Listen for path changes when towers are built
     document.addEventListener('pathChanged', this.onPathChanged.bind(this));
@@ -103,6 +104,7 @@ export class EnemyManager {
     this.enemiesSpawned = 0; // Track how many we've actually spawned
     this.enemiesKilled = 0; // Track how many were killed
     this.enemiesReachedEnd = 0; // Track how many reached the end
+    this.enemyCount = enemyCount; // Store for reference
     
     // Store wave parameters for enemy spawning
     this.currentWaveHealthScaling = healthScaling;
@@ -122,7 +124,10 @@ export class EnemyManager {
     // Faster spawning for higher waves, but not too fast
     const baseSpawnInterval = 1000; // 1 second
     const spawnIntervalReduction = Math.min(0.7, (waveNumber - 1) * 0.02); // Up to 70% reduction
-    const spawnInterval = baseSpawnInterval * (1 - spawnIntervalReduction);
+    
+    // Apply game speed to the spawn interval if gameManager exists
+    const gameSpeed = this.gameManager ? this.gameManager.gameSpeed : 1.0;
+    const spawnInterval = (baseSpawnInterval * (1 - spawnIntervalReduction)) / gameSpeed;
     
     console.log(`Spawning enemy every ${spawnInterval}ms`);
     
