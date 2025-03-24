@@ -2,7 +2,7 @@ import { GridManager } from './GridManager.js';
 import { EnemyManager } from './EnemyManager.js';
 import { TowerManager } from './TowerManager.js';
 import { GameManager } from './GameManager.js';
-import { TOWER_TYPES } from './TowerTypes.js';
+import { getTowerTypes } from './TowerTypes.js';
 
 // Global variables to track game instances
 let gridManager, enemyManager, towerManager, gameManager, scene;
@@ -71,7 +71,10 @@ function initGame(faction) {
     waveTimer = null;
   }
   
-  // Initialize three.js
+  // Get faction-specific tower types
+  const towerTypes = getTowerTypes(faction);
+  
+  // Initialize Three.js
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb); // Sky blue background
   
@@ -126,7 +129,7 @@ function initGame(faction) {
   enemyManager = new EnemyManager(scene, gridManager);
   
   // Create tower manager
-  towerManager = new TowerManager(scene, gridManager);
+  towerManager = new TowerManager(scene, gridManager, towerTypes);
   
   // Create game manager and pass other managers
   gameManager = new GameManager(gridManager, enemyManager, towerManager);
@@ -137,7 +140,7 @@ function initGame(faction) {
     towerManager.updatePathVisualization(initialPath);
   }
   
-  // Setup tower selection panel
+  // Setup tower selection panel with faction-specific towers
   setupTowerSelectionPanel(towerManager, faction);
   
   // Raycaster for mouse interaction
@@ -245,6 +248,7 @@ function initGame(faction) {
   function animate() {
     requestAnimationFrame(animate);
     
+    // Update game state if not paused
     gameManager.update();
     
     renderer.render(scene, camera);
@@ -393,12 +397,11 @@ function setupTowerSelectionPanel(towerManager, faction) {
   // Clear any existing content
   panel.innerHTML = '';
   
-  // Filter towers based on faction or use all
-  let filteredTowers = TOWER_TYPES;
-  // In the future, we could filter towers by faction
+  // Get faction-specific tower types
+  const towerTypes = towerManager.towerTypes;
   
   // Add each tower option
-  filteredTowers.forEach(tower => {
+  towerTypes.forEach(tower => {
     const towerOption = document.createElement('div');
     towerOption.classList.add('tower-option');
     towerOption.dataset.towerId = tower.id;
@@ -436,39 +439,87 @@ function setupTowerSelectionPanel(towerManager, faction) {
       towerOption.classList.add('selected');
     }
     
-    // Add event listener
+    // Add click event to select tower
     towerOption.addEventListener('click', () => {
       // Remove selected class from all options
-      document.querySelectorAll('.tower-option').forEach(opt => {
-        opt.classList.remove('selected');
-      });
+      document.querySelectorAll('.tower-option').forEach(opt => 
+        opt.classList.remove('selected'));
       
-      // Add selected class to clicked option
+      // Add selected class to this option
       towerOption.classList.add('selected');
       
-      // Set the selected tower type
+      // Set the selected tower type in the tower manager
       towerManager.setSelectedTowerType(tower.id);
+      
+      // Update stats display
+      updateTowerStats(tower, faction);
     });
     
-    // Hover event for stats
+    // Add hover event to display stats
     towerOption.addEventListener('mouseenter', () => {
-      // Update and show stats panel
-      document.getElementById('tower-name').textContent = tower.name;
-      document.getElementById('tower-cost-stat').textContent = `$${tower.cost}`;
-      document.getElementById('tower-damage-stat').textContent = tower.damage;
-      document.getElementById('tower-range-stat').textContent = tower.range;
-      document.getElementById('tower-fire-rate-stat').textContent = tower.fireRate.toFixed(1);
-      document.getElementById('tower-description').textContent = tower.description;
-      
+      updateTowerStats(tower, faction);
       statsPanel.style.display = 'block';
     });
     
-    towerOption.addEventListener('mouseleave', () => {
-      statsPanel.style.display = 'none';
-    });
-    
+    // Add to panel
     panel.appendChild(towerOption);
   });
+  
+  // Update stats for the default selected tower
+  const defaultTower = towerTypes.find(t => t.id === 1);
+  if (defaultTower) {
+    updateTowerStats(defaultTower, faction);
+  }
+  
+  // Show stats panel on hover over any tower option
+  panel.addEventListener('mouseenter', () => {
+    statsPanel.style.display = 'block';
+  });
+  
+  // Hide stats panel when mouse leaves the panel area
+  panel.addEventListener('mouseleave', () => {
+    statsPanel.style.display = 'none';
+  });
+}
+
+// Update tower stats display
+function updateTowerStats(tower, faction) {
+  const statsPanel = document.getElementById('tower-stats');
+  if (!statsPanel) return;
+  
+  // Get faction color for styling
+  let factionColor;
+  switch(faction) {
+    case 'tech': factionColor = '#00c6ff'; break;
+    case 'energy': factionColor = '#f5d020'; break;
+    case 'elemental': factionColor = '#a8e063'; break;
+    default: factionColor = '#00c6ff';
+  }
+  
+  // Update content
+  statsPanel.innerHTML = `
+    <h3 id="tower-name" style="color:${factionColor}">${tower.name}</h3>
+    <div class="stat-row">
+      <span class="stat-label">Cost:</span>
+      <span class="stat-value" style="color:gold">$${tower.cost}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Damage:</span>
+      <span class="stat-value damage-value">${tower.damage}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Range:</span>
+      <span class="stat-value range-value">${tower.range}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Fire Rate:</span>
+      <span class="stat-value speed-value">${tower.fireRate}/s</span>
+    </div>
+    <div id="tower-description">${tower.description}</div>
+  `;
+  
+  // Set the border color to match faction
+  statsPanel.style.borderColor = factionColor;
 }
 
 // Reset all game elements when returning to faction selection

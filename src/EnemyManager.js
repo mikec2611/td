@@ -76,11 +76,11 @@ export class EnemyManager {
     return closestIndex;
   }
   
-  startWave(waveNumber = this.waveNumber, enemyCount = 10, enemyTypes = ['normal'], healthScaling = 1.0, speedScaling = 1.0) {
+  startWave(waveNumber = this.waveNumber, enemyCount = 10, enemyTypes = ['normal'], healthScaling = 1.0, speedScaling = 1.0, armorScaling = 1.0) {
     if (this.waveInProgress) return false;
     
     console.log(`Starting wave ${waveNumber} with ${enemyCount} enemies of types: ${enemyTypes.join(', ')}`);
-    console.log(`Health scaling: ${healthScaling}x, Speed scaling: ${speedScaling}x`);
+    console.log(`Health scaling: ${healthScaling}x, Speed scaling: ${speedScaling}x, Armor scaling: ${armorScaling}x`);
     
     // Clear any existing spawn interval
     if (this.spawnInterval) {
@@ -107,6 +107,7 @@ export class EnemyManager {
     // Store wave parameters for enemy spawning
     this.currentWaveHealthScaling = healthScaling;
     this.currentWaveSpeedScaling = speedScaling;
+    this.currentWaveArmorScaling = armorScaling;
     this.currentWaveEnemyTypes = enemyTypes;
     
     // Find path
@@ -220,8 +221,7 @@ export class EnemyManager {
         armor = 0.2; // 20% damage reduction
         break;
         
-      case 'normal':
-      default:
+      default: // normal
         enemyColor = 0xff0000; // Red
         enemySize = 1.0;
         healthMultiplier = 1.0;
@@ -230,161 +230,113 @@ export class EnemyManager {
         break;
     }
     
-    // Apply wave scaling to the multipliers
-    healthMultiplier *= this.currentWaveHealthScaling;
-    speedMultiplier *= this.currentWaveSpeedScaling;
+    // Apply wave scaling to enemy stats
+    const baseHealth = 100;
+    const baseSpeed = this.enemySpeed;
+    
+    // Calculate final values using both type multipliers and wave scaling
+    const finalHealth = baseHealth * healthMultiplier * this.currentWaveHealthScaling;
+    const finalSpeed = baseSpeed * speedMultiplier * this.currentWaveSpeedScaling;
+    
+    // Apply armor scaling only to enemies that have armor
+    const finalArmor = (armor > 0) ? armor * this.currentWaveArmorScaling : armor;
+    
+    // Visual scaling to represent increasing difficulty
+    // The higher the wave, the more intense the enemy looks
+    const waveVisualIntensity = Math.min(1, (this.waveNumber - 1) * 0.04); // Caps at 100% extra intensity
     
     // Create enemy body with scaled size
-    const bodyGeometry = new THREE.CylinderGeometry(0.5 * enemySize, 0.5 * enemySize, 0.8 * enemySize, 8);
-    const bodyMaterial = new THREE.MeshLambertMaterial({ 
-      color: enemyColor,
-      emissive: new THREE.Color(enemyColor).offsetHSL(0, 0, -0.5) // Darker version for glow
-    });
-    const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    bodyMesh.position.y = 0.4 * enemySize;
-    enemyGroup.add(bodyMesh);
+    const geometry = new THREE.BoxGeometry(enemySize, enemySize, enemySize);
     
-    // Create enemy head - shape varies by enemy type
-    let headGeometry;
+    // Apply visual enhancements based on wave difficulty
+    let material;
     
-    switch(enemyType) {
-      case 'fast':
-        headGeometry = new THREE.ConeGeometry(0.35 * enemySize, 0.7 * enemySize, 4);
-        break;
-        
-      case 'tough':
-        headGeometry = new THREE.BoxGeometry(0.7 * enemySize, 0.4 * enemySize, 0.7 * enemySize);
-        break;
-        
-      case 'armored':
-        headGeometry = new THREE.IcosahedronGeometry(0.35 * enemySize);
-        break;
-        
-      case 'boss':
-        headGeometry = new THREE.DodecahedronGeometry(0.35 * enemySize);
-        break;
-        
-      case 'elite':
-        headGeometry = new THREE.TorusGeometry(0.25 * enemySize, 0.1 * enemySize);
-        break;
-        
-      case 'normal':
-      default:
-        headGeometry = new THREE.OctahedronGeometry(0.35 * enemySize, 0);
-        break;
-    }
-    
-    const headMaterial = new THREE.MeshLambertMaterial({ 
-      color: new THREE.Color(enemyColor).offsetHSL(0, 0.2, 0.1),
-      emissive: new THREE.Color(enemyColor).offsetHSL(0, 0, -0.3)
-    });
-    const headMesh = new THREE.Mesh(headGeometry, headMaterial);
-    headMesh.position.y = 0.9 * enemySize;
-    enemyGroup.add(headMesh);
-    
-    // Add a pulsing effect to make enemies more visible
-    const pulseLight = new THREE.PointLight(
-      new THREE.Color(enemyColor).offsetHSL(0, 0.5, 0), 
-      0.8, 
-      2 * enemySize
-    );
-    pulseLight.position.y = 0.6 * enemySize;
-    enemyGroup.add(pulseLight);
-    
-    // Store the pulse light reference for animation
-    enemyGroup.userData.pulseLight = pulseLight;
-    enemyGroup.userData.pulseTime = Math.random() * Math.PI * 2; // Random starting phase
-    enemyGroup.userData.enemyType = enemyType; // Store enemy type for reference
-    
-    // Add type-specific visual indicators
-    if (enemyType === 'armored' || enemyType === 'boss') {
-      // Add armor plates
-      const plateGeometry = new THREE.RingGeometry(
-        0.6 * enemySize, 
-        0.7 * enemySize, 
-        6
-      );
-      const plateMaterial = new THREE.MeshLambertMaterial({
-        color: 0xaaaaaa,
-        side: THREE.DoubleSide
+    if (this.waveNumber > 15) {
+      // Advanced enemies get emissive material to glow
+      material = new THREE.MeshStandardMaterial({
+        color: enemyColor,
+        emissive: enemyColor,
+        emissiveIntensity: 0.3 + waveVisualIntensity * 0.7, // More glow at higher waves
+        metalness: finalArmor * 0.7, // Armored enemies look more metallic
+        roughness: 0.3
       });
-      
-      for (let i = 0; i < 3; i++) {
-        const plate = new THREE.Mesh(plateGeometry, plateMaterial);
-        plate.rotation.x = Math.PI / 2;
-        plate.position.y = (0.3 + i * 0.3) * enemySize;
-        enemyGroup.add(plate);
-      }
+    } else {
+      // Basic material for earlier waves
+      material = new THREE.MeshStandardMaterial({
+        color: enemyColor,
+        metalness: finalArmor * 0.5,
+        roughness: 0.5
+      });
     }
     
-    if (enemyType === 'fast') {
-      // Add speed trail
-      const trailGeometry = new THREE.PlaneGeometry(0.8 * enemySize, 0.4 * enemySize);
-      const trailMaterial = new THREE.MeshBasicMaterial({
+    const enemyMesh = new THREE.Mesh(geometry, material);
+    enemyMesh.castShadow = true;
+    enemyMesh.receiveShadow = true;
+    
+    // Add visual indicators for powerful enemies
+    if (this.currentWaveHealthScaling > 2.0 || enemyType === 'boss' || enemyType === 'elite') {
+      // Add a pulsing glow effect or particle system
+      const glowGeometry = new THREE.SphereGeometry(enemySize * 1.2, 8, 8);
+      const glowMaterial = new THREE.MeshBasicMaterial({
         color: enemyColor,
         transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
+        opacity: 0.3
       });
-      const trail = new THREE.Mesh(trailGeometry, trailMaterial);
-      trail.rotation.x = -Math.PI / 2;
-      trail.position.y = 0.05;
-      trail.position.z = -0.6 * enemySize;
-      enemyGroup.add(trail);
+      const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+      enemyGroup.add(glowMesh);
     }
     
-    if (enemyType === 'elite' || enemyType === 'boss') {
-      // Add glowing aura
-      const auraGeometry = new THREE.SphereGeometry(0.8 * enemySize, 8, 8);
-      const auraMaterial = new THREE.MeshBasicMaterial({
-        color: enemyColor,
-        transparent: true,
-        opacity: 0.2,
-        side: THREE.DoubleSide
-      });
-      const aura = new THREE.Mesh(auraGeometry, auraMaterial);
-      aura.position.y = 0.6 * enemySize;
-      enemyGroup.add(aura);
-      
-      // Store for animation
-      enemyGroup.userData.aura = aura;
-    }
+    enemyGroup.add(enemyMesh);
+    
+    // Position at the start of the path
+    const startCell = path[0];
+    const startPos = this.gridManager.getWorldPosition(startCell);
+    enemyGroup.position.copy(startPos);
     
     // Add health bar
-    const healthBarGroup = this.createHealthBar(enemySize);
-    healthBarGroup.position.y = 1.6 * enemySize;
-    enemyGroup.add(healthBarGroup);
+    const healthBarWidth = 0.8;
+    const healthBarHeight = 0.15;
+    const healthBarGroup = new THREE.Group();
     
-    // Set initial position (start cell)
-    const startPos = this.gridManager.getWorldPosition(this.gridManager.grid[this.gridManager.startCell.y][this.gridManager.startCell.x]);
-    enemyGroup.position.copy(startPos);
+    // Health bar background (black)
+    const healthBarBgGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+    const healthBarBgMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const healthBarBg = new THREE.Mesh(healthBarBgGeometry, healthBarBgMaterial);
+    healthBarGroup.add(healthBarBg);
+    
+    // Health bar foreground (green)
+    const healthBarFgGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+    const healthBarFgMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const healthBarFg = new THREE.Mesh(healthBarFgGeometry, healthBarFgMaterial);
+    
+    // Position the health bar slightly to the left (centered)
+    healthBarFg.position.x = 0;
+    
+    healthBarGroup.add(healthBarFg);
+    
+    // Position health bar above enemy
+    healthBarGroup.position.y = enemySize / 2 + 0.3;
+    healthBarGroup.rotation.x = -Math.PI / 2; // Face camera (assuming top-down view)
+    
+    enemyGroup.add(healthBarGroup);
     
     // Add to scene
     this.scene.add(enemyGroup);
     
-    // Calculate health based on wave number and type
-    const baseHealth = 100;
-    const waveMultiplier = 1 + (this.waveNumber - 1) * 0.2; // 20% more health per wave
-    const maxHealth = Math.floor(baseHealth * waveMultiplier * healthMultiplier);
-    
-    // Calculate current speed
-    const baseSpeed = this.enemySpeed;
-    const speed = baseSpeed * speedMultiplier;
-    
     // Create enemy object
     const enemy = {
       mesh: enemyGroup,
-      healthBar: healthBarGroup.children[0], // The green bar
-      health: maxHealth,
-      maxHealth: maxHealth,
+      healthBar: healthBarFg, // The green bar
+      health: finalHealth,
+      maxHealth: finalHealth,
       currentPathIndex: 0,
       path: path,
-      speed: speed,
+      speed: finalSpeed,
       reachedEnd: false,
       dead: false,
       pulseTime: 0, // For animation
       type: enemyType,
-      armor: armor
+      armor: finalArmor
     };
     
     this.enemies.push(enemy);

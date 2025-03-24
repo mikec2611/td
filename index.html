@@ -451,6 +451,105 @@
     .play-again-btn:hover {
       transform: scale(1.1);
     }
+
+    /* Developer Panel Popup */
+    #dev-panel {
+      position: absolute;
+      bottom: 70px;
+      right: 10px;
+      width: 200px;
+      background-color: rgba(20, 20, 30, 0.9);
+      border: 1px solid #ff0000;
+      border-radius: 5px;
+      padding: 10px;
+      z-index: 11;
+      display: none;
+      box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+    }
+    
+    #dev-panel h3 {
+      color: #ff0000;
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      text-align: center;
+      border-bottom: 1px solid #ff0000;
+      padding-bottom: 5px;
+    }
+    
+    .dev-control {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .dev-control label {
+      color: #ccc;
+      font-size: 14px;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #333;
+      transition: .4s;
+      border-radius: 20px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+      background-color: #ff0000;
+    }
+    
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    
+    #pause-game-btn {
+      width: 100%;
+      margin-top: 5px;
+      background-color: #333;
+      color: #ccc;
+      border: 1px solid #666;
+      padding: 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    #pause-game-btn:hover, 
+    #pause-game-btn.active {
+      background-color: #ff0000;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -520,6 +619,7 @@
       <div>Money: <span id="money">100</span></div>
       <div>Lives: <span id="lives">10</span></div>
       <div>Wave: <span id="wave">1</span></div>
+      <div>Difficulty: <span id="difficulty">Normal</span></div>
     </div>
     <div id="game-info">
       <div>Build towers to create a maze</div>
@@ -559,6 +659,26 @@
     </div>
     <div id="dev-mode">
       <button id="toggle-dev-mode">DEV MODE</button>
+    </div>
+    
+    <!-- Developer Panel -->
+    <div id="dev-panel">
+      <h3>DEVELOPER PANEL</h3>
+      <div class="dev-control">
+        <label for="infinite-gold">Infinite Gold</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="infinite-gold">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="dev-control">
+        <label for="infinite-lives">Infinite Lives</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="infinite-lives">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button id="pause-game-btn">Pause Game</button>
     </div>
   </div>
   

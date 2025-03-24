@@ -18,12 +18,16 @@ export class GameManager {
     
     // Developer mode
     this.devMode = false;
+    this.infiniteGold = false;
+    this.infiniteLives = false;
+    this.gamePaused = false;
     this.originalEnemySpeed = this.enemyManager.enemySpeed;
     
     // UI elements
     this.goldDisplay = document.getElementById('money');
     this.healthDisplay = document.getElementById('lives');
     this.waveDisplay = document.getElementById('wave');
+    this.difficultyDisplay = document.getElementById('difficulty');
     this.enemiesDisplay = document.getElementById('enemies-remaining') || document.createElement('span');
     this.gameInfoDisplay = document.getElementById('game-info') || document.createElement('div');
     this.notificationArea = document.getElementById('notification-area');
@@ -46,26 +50,88 @@ export class GameManager {
       devModeButton.addEventListener('click', () => this.toggleDevMode());
     }
     
+    // Setup developer panel controls
+    this.setupDevPanelControls();
+    
     // Initial UI update
     this.updateUI();
+  }
+  
+  setupDevPanelControls() {
+    // Get dev panel elements
+    const infiniteGoldToggle = document.getElementById('infinite-gold');
+    const infiniteLivesToggle = document.getElementById('infinite-lives');
+    const pauseGameBtn = document.getElementById('pause-game-btn');
+    
+    // Add event listeners
+    if (infiniteGoldToggle) {
+      infiniteGoldToggle.addEventListener('change', () => {
+        this.infiniteGold = infiniteGoldToggle.checked;
+        this.updateUI();
+        this.showNotification(`Infinite Gold ${this.infiniteGold ? 'ENABLED' : 'DISABLED'}`, '#ffcc00');
+      });
+    }
+    
+    if (infiniteLivesToggle) {
+      infiniteLivesToggle.addEventListener('change', () => {
+        this.infiniteLives = infiniteLivesToggle.checked;
+        this.updateUI();
+        this.showNotification(`Infinite Lives ${this.infiniteLives ? 'ENABLED' : 'DISABLED'}`, '#00ccff');
+      });
+    }
+    
+    if (pauseGameBtn) {
+      pauseGameBtn.addEventListener('click', () => {
+        this.gamePaused = !this.gamePaused;
+        
+        if (this.gamePaused) {
+          pauseGameBtn.textContent = 'Resume Game';
+          pauseGameBtn.classList.add('active');
+          this.showNotification('Game PAUSED', '#ffffff');
+        } else {
+          pauseGameBtn.textContent = 'Pause Game';
+          pauseGameBtn.classList.remove('active');
+          this.showNotification('Game RESUMED', '#ffffff');
+        }
+      });
+    }
   }
   
   toggleDevMode() {
     this.devMode = !this.devMode;
     
     const devModeButton = document.getElementById('toggle-dev-mode');
+    const devPanel = document.getElementById('dev-panel');
     
     if (this.devMode) {
       // Enable dev mode
       devModeButton.classList.add('active');
-      this.enemyManager.enemySpeed = this.originalEnemySpeed * 10; // 10x faster enemies
+      if (devPanel) devPanel.style.display = 'block';
       
       // Display dev mode notification
       this.showNotification('DEVELOPER MODE ENABLED', '#ff0000');
     } else {
       // Disable dev mode
       devModeButton.classList.remove('active');
-      this.enemyManager.enemySpeed = this.originalEnemySpeed; // Reset enemy speed
+      if (devPanel) devPanel.style.display = 'none';
+      
+      // Reset other dev settings when disabling dev mode
+      this.infiniteGold = false;
+      this.infiniteLives = false;
+      if (this.gamePaused) {
+        this.gamePaused = false;
+        const pauseGameBtn = document.getElementById('pause-game-btn');
+        if (pauseGameBtn) {
+          pauseGameBtn.textContent = 'Pause Game';
+          pauseGameBtn.classList.remove('active');
+        }
+      }
+      
+      // Reset toggle switches
+      const infiniteGoldToggle = document.getElementById('infinite-gold');
+      const infiniteLivesToggle = document.getElementById('infinite-lives');
+      if (infiniteGoldToggle) infiniteGoldToggle.checked = false;
+      if (infiniteLivesToggle) infiniteLivesToggle.checked = false;
       
       // Display dev mode notification
       this.showNotification('DEVELOPER MODE DISABLED', '#ffffff');
@@ -121,16 +187,22 @@ export class GameManager {
     }
   }
   
-  update() {
+  update(deltaTime) {
+    // If game is paused, don't update
+    if (this.gamePaused) return;
+    
+    // Store the current time
     const currentTime = performance.now() / 1000;
-    const deltaTime = currentTime - this.lastUpdateTime;
+    
+    // Calculate real delta time
+    const realDeltaTime = currentTime - this.lastUpdateTime;
     this.lastUpdateTime = currentTime;
     
-    // Update enemy manager
-    this.enemyManager.update(deltaTime);
+    // Update the enemy manager
+    this.enemyManager.update(realDeltaTime);
     
-    // Update tower manager
-    this.towerManager.update(deltaTime, this.enemyManager);
+    // Update the tower manager
+    this.towerManager.update(realDeltaTime, this.enemyManager);
     
     // Update enemies display
     if (this.enemiesDisplay) {
@@ -139,26 +211,8 @@ export class GameManager {
   }
   
   handleCellClick(cell) {
-    // Check if we have enough money to build the selected tower
-    const towerCost = this.towerManager.getTowerCost();
-    
-    // In dev mode, ignore money requirements
-    if (this.devMode || this.money >= towerCost) {
-      // Try to build tower
-      const tower = this.towerManager.buildTower(cell.x, cell.y);
-      
-      if (tower) {
-        // Deduct money (if not in dev mode)
-        if (!this.devMode) {
-          this.money -= towerCost;
-        }
-        this.updateUI();
-      } else {
-        this.showNotification('Cannot build there!', '#ff5555');
-      }
-    } else {
-      this.showNotification('Not enough gold!', '#ff5555');
-    }
+    // Just call our buildTower method
+    this.buildTower(cell.x, cell.y);
   }
   
   setBuildMode(mode) {
@@ -168,18 +222,52 @@ export class GameManager {
   startWave(waveNumber = 1, maxWaves = 30) {
     this.waveNumber = waveNumber;
     
-    // Calculate difficulty based on wave number
-    const difficultyFactor = waveNumber / maxWaves;
+    // Fixed number of enemies per wave - first wave has more enemies now for more challenge
+    const FIXED_ENEMY_COUNT = waveNumber === 1 ? 12 : 15;
     
-    // Scale enemy count: starts at 10, increases by 3-5 each wave, capped at 80
-    const baseEnemyCount = this.enemySpawnCount;
-    const enemyCountIncrease = Math.floor(3 + (waveNumber / 5));
-    const maxEnemyCount = 80;
-    const enemyCount = Math.min(baseEnemyCount + ((waveNumber - 1) * enemyCountIncrease), maxEnemyCount);
+    // Calculate difficulty scaling factors based on wave number
+    // These values determine how quickly the game gets harder
+    // Use non-linear scaling to make early waves easier but late waves much harder
+    
+    // Easing function to create non-linear difficulty scaling
+    // Early waves scale slowly, later waves scale faster
+    const easeInQuadratic = (x) => x * x;
+    const normalizedWave = (waveNumber - 1) / (maxWaves - 1); // 0 to 1
+    const scalingFactor = easeInQuadratic(normalizedWave);
+    
+    // Set up base difficulty parameters
+    const INITIAL_HEALTH = 100;  // Base health for wave 1
+    const FINAL_HEALTH = 800;    // Target health for final wave
+    const INITIAL_SPEED = 1.0;   // Base speed for wave 1
+    const FINAL_SPEED = 2.5;     // Target speed for final wave
+    const INITIAL_ARMOR = 0.0;   // Base armor for wave 1
+    const FINAL_ARMOR = 0.6;     // Target armor for final wave
+
+    // Calculate actual scaling values with a minimum baseline
+    // First wave is always at base level (1.0)
+    let healthScaling, speedScaling, armorScaling;
+    
+    if (waveNumber === 1) {
+      // First wave has baseline difficulty, no need for extra starting money
+      healthScaling = 1.0;
+      speedScaling = 1.0;
+      armorScaling = 1.0;
+    } else {
+      // Apply non-linear scaling for waves 2+
+      // This starts slow and accelerates for later waves
+      const progressionCurve = easeInQuadratic((waveNumber - 1) / (maxWaves - 1));
+      
+      healthScaling = 1.0 + progressionCurve * ((FINAL_HEALTH / INITIAL_HEALTH) - 1.0);
+      speedScaling = 1.0 + progressionCurve * ((FINAL_SPEED / INITIAL_SPEED) - 1.0);
+      armorScaling = 1.0 + progressionCurve * ((FINAL_ARMOR / INITIAL_ARMOR + 0.1) - 1.0);
+    }
+    
+    console.log(`Wave ${waveNumber} scaling - Health: ${healthScaling.toFixed(2)}x, Speed: ${speedScaling.toFixed(2)}x, Armor: ${armorScaling.toFixed(2)}x`);
     
     // Determine enemy types based on wave number
     let availableEnemyTypes = ['normal'];
     
+    // Introduce new enemy types as waves progress
     if (waveNumber >= 5) {
       availableEnemyTypes.push('fast'); // Fast enemies starting at wave 5
     }
@@ -200,36 +288,63 @@ export class GameManager {
       availableEnemyTypes.push('elite'); // Elite enemies starting at wave 25
     }
     
-    // Calculate enemy health and speed scaling
-    const healthScaling = 1 + (difficultyFactor * 4); // Health scales up to 5x
-    const speedScaling = 1 + (difficultyFactor * 1.5); // Speed scales up to 2.5x
-    
     // Start the wave with calculated parameters
     this.enemyManager.startWave(
-      this.waveNumber, 
-      enemyCount, 
-      availableEnemyTypes, 
+      this.waveNumber,
+      FIXED_ENEMY_COUNT,
+      availableEnemyTypes,
       healthScaling,
-      speedScaling
+      speedScaling,
+      armorScaling // Pass armor scaling as an additional parameter
     );
     
     this.updateUI();
     
-    // Show a notification about the wave
-    if (waveNumber >= 20) {
-      this.showNotification(`Wave ${waveNumber}: DANGER! Boss enemies incoming!`, '#ff5500');
-    } else if (waveNumber >= 15) {
-      this.showNotification(`Wave ${waveNumber}: Armored enemies approaching!`, '#ff9900');
-    } else if (waveNumber >= 10) {
-      this.showNotification(`Wave ${waveNumber}: Tough enemies approaching!`, '#ffcc00');
-    } else if (waveNumber >= 5) {
-      this.showNotification(`Wave ${waveNumber}: Fast enemies incoming!`, '#aaff00');
-    } else {
-      this.showNotification(`Wave ${waveNumber} incoming!`, '#ffffff');
-    }
+    // Show wave difficulty info
+    this.showWaveDifficultyInfo(waveNumber, healthScaling, speedScaling, armorScaling);
   }
   
-  onEnemyReachedEnd() {
+  // Display wave difficulty information to the player
+  showWaveDifficultyInfo(waveNumber, healthScaling, speedScaling, armorScaling) {
+    let waveMessage = '';
+    let color = '#ffffff';
+    
+    // Determine wave message and color based on wave number
+    if (waveNumber >= 20) {
+      waveMessage = `Wave ${waveNumber}: DANGER! Boss enemies incoming!`;
+      color = '#ff5500';
+    } else if (waveNumber >= 15) {
+      waveMessage = `Wave ${waveNumber}: Armored enemies approaching!`;
+      color = '#ff9900';
+    } else if (waveNumber >= 10) {
+      waveMessage = `Wave ${waveNumber}: Tough enemies approaching!`;
+      color = '#ffcc00';
+    } else if (waveNumber >= 5) {
+      waveMessage = `Wave ${waveNumber}: Fast enemies incoming!`;
+      color = '#aaff00';
+    } else {
+      waveMessage = `Wave ${waveNumber} incoming!`;
+      color = '#ffffff';
+    }
+    
+    // Show main wave notification
+    this.showNotification(waveMessage, color);
+    
+    // Show difficulty information
+    setTimeout(() => {
+      // Display difficulty stats after a short delay so it doesn't overlap with the main notification
+      const difficultyInfo = `Enemy Stats: Health ${Math.round(healthScaling * 100)}%, Speed ${Math.round(speedScaling * 100)}%`;
+      this.displayGameInfo(difficultyInfo);
+    }, 1500);
+  }
+  
+  onEnemyReachedEnd(event) {
+    if (this.infiniteLives) {
+      // If infinite lives is enabled, don't reduce lives
+      this.showNotification('Enemy reached the end! (No life lost in dev mode)', '#00ccff');
+      return;
+    }
+    
     // If game is already over, don't process
     if (this.gameIsOver) return;
     
@@ -269,9 +384,23 @@ export class GameManager {
         break;
     }
     
-    // Apply wave scaling to rewards
-    const waveScaling = 1 + Math.floor(this.waveNumber / 3) * 0.1; // 10% increase every 3 waves
-    const rewardAmount = Math.floor(baseReward * waveScaling);
+    // Apply controlled wave scaling to rewards
+    // Instead of linearly increasing rewards, use a curve that gives
+    // diminishing returns at higher waves to prevent snowballing
+    
+    let rewardMultiplier;
+    if (this.waveNumber <= 5) {
+      // Early waves: normal scaling to help player build up
+      rewardMultiplier = 1 + ((this.waveNumber - 1) * 0.1); // 10% increase per wave
+    } else if (this.waveNumber <= 15) {
+      // Mid waves: slowing reward growth
+      rewardMultiplier = 1.5 + ((this.waveNumber - 5) * 0.05); // 5% increase per wave
+    } else {
+      // Late waves: very slow reward growth
+      rewardMultiplier = 2.0 + ((this.waveNumber - 15) * 0.02); // 2% increase per wave
+    }
+    
+    const rewardAmount = Math.floor(baseReward * rewardMultiplier);
     
     // Award money
     this.money += rewardAmount;
@@ -285,14 +414,35 @@ export class GameManager {
   }
   
   onWaveCompleted(event) {
-    // Award completion bonus
-    const waveCompletionBonus = 50 + (event.detail.waveNumber * 20);
-    this.money += waveCompletionBonus;
+    // Award completion bonus - scale rewards to make early waves give decent rewards 
+    // but prevent excessive snowballing in later waves
     
+    // Base wave completion bonus that scales in a controlled manner
+    // Early waves give moderate rewards, later waves give less relative to difficulty
+    const waveNumber = event.detail.waveNumber;
+    
+    // Calculate wave bonus with diminishing returns
+    // Early waves give moderate bonuses to prevent early game too-easy accumulation
+    // Later waves provide less bonus per difficulty level to prevent snowballing
+    let waveCompletionBonus;
+    
+    if (waveNumber <= 5) {
+      // Early waves: moderate rewards to prevent early game advantage
+      waveCompletionBonus = 40 + (waveNumber * 10);
+    } else if (waveNumber <= 15) {
+      // Mid waves: moderate rewards that grow slower
+      waveCompletionBonus = 90 + ((waveNumber - 5) * 10);
+    } else {
+      // Late waves: minimal additional rewards to prevent excessive resources
+      waveCompletionBonus = 190 + ((waveNumber - 15) * 5);
+    }
+    
+    this.money += waveCompletionBonus;
     this.waveNumber = event.detail.nextWaveNumber;
     this.updateUI();
     
-    this.showNotification(`Wave ${event.detail.waveNumber} completed! Next wave ready.`, '#55ff55');
+    // Show appropriate completion message with the reward
+    this.showNotification(`Wave ${event.detail.waveNumber} completed! +$${waveCompletionBonus}`, '#55ff55');
   }
   
   onPathChanged(event) {
@@ -315,17 +465,42 @@ export class GameManager {
   }
   
   updateUI() {
-    // Update UI displays
-    if (this.devMode) {
-      this.goldDisplay.textContent = "∞"; // Infinity symbol for unlimited money
-      this.goldDisplay.style.color = "#ff9900"; // Gold color to indicate dev mode
-    } else {
-      this.goldDisplay.textContent = this.money;
-      this.goldDisplay.style.color = ""; // Reset to default
+    if (this.goldDisplay) {
+      // Show special value for infinite gold
+      if (this.devMode || this.infiniteGold) {
+        this.goldDisplay.textContent = '∞'; // Infinity symbol
+        this.goldDisplay.style.color = "#ffcc00"; // Gold color to indicate dev mode
+      } else {
+        this.goldDisplay.textContent = this.money;
+        this.goldDisplay.style.color = ""; // Reset to default color
+      }
     }
     
-    this.healthDisplay.textContent = this.lives;
-    this.waveDisplay.textContent = this.waveNumber;
+    if (this.healthDisplay) {
+      // Show special value for infinite lives
+      if (this.infiniteLives) {
+        this.healthDisplay.textContent = '∞'; // Infinity symbol
+        this.healthDisplay.style.color = "#00ccff"; // Blue color to indicate infinite lives
+      } else {
+        this.healthDisplay.textContent = this.lives;
+        this.healthDisplay.style.color = ""; // Reset to default color
+      }
+    }
+    
+    if (this.waveDisplay) {
+      this.waveDisplay.textContent = this.waveNumber;
+    }
+    
+    if (this.difficultyDisplay) {
+      // Display difficulty based on wave number
+      if (this.waveNumber <= 10) {
+        this.difficultyDisplay.textContent = "Normal";
+      } else if (this.waveNumber <= 20) {
+        this.difficultyDisplay.textContent = "Hard";
+      } else {
+        this.difficultyDisplay.textContent = "Insane";
+      }
+    }
   }
   
   gameOver() {
@@ -475,5 +650,31 @@ export class GameManager {
     setTimeout(() => {
       gameOverScreen.style.opacity = '1';
     }, 100);
+  }
+  
+  buildTower(x, y) {
+    const towerCost = this.towerManager.getTowerCost();
+    
+    // In dev mode, infinite gold, or if you have enough money
+    if (this.devMode || this.infiniteGold || this.money >= towerCost) {
+      const tower = this.towerManager.buildTower(x, y);
+      
+      if (tower) {
+        // Deduct money (if not in dev mode or infinite gold)
+        if (!this.devMode && !this.infiniteGold) {
+          this.money -= towerCost;
+        }
+        
+        // Update the UI
+        this.updateUI();
+        
+        return tower;
+      }
+    } else {
+      // Not enough money
+      this.showNotification('Not enough money to build tower!', '#ff0000');
+    }
+    
+    return null;
   }
 } 
